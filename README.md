@@ -1,3 +1,2 @@
-# vanillyn.github.io
-Not finished yet.
-Will have links to other stuff
+# Vanillyn's Github Page
+essentially just a github page but with vanillyn
