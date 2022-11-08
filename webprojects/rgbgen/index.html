@@ -1,0 +1,137 @@
+<html>
+  <head>
+      <meta name="description" content="create gradient text in minecraft!">
+  <meta name="title" content="minecraft text generator">
+  <meta name="keywords" content="minecraft, text, generator, rgb, gradient">
+  <meta name="author" content="Vanillyn">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta property="og:title" content="minecraft text generator" />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="http://vanillyn.github.io/RGBGen" />
+  <meta property="og:image" content="https://media.discordapp.net/attachments/1015060231060983891/1036028579668049930/luoxiaohei-cat_1.gif" />
+  <meta property="og:description" content="create gradient text in minecraft!" />
+<meta name="theme-color" content="#FF9DC0">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css">
+    <link rel="stylesheet" href="./style.css">
+    <link rel="icon" type="image/x-icon" href="https://media.discordapp.net/attachments/1015060231060983891/1035299761667969145/luoxiaohei-cat.gif">
+    <link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+    <script type="text/javascript" src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
+    <title>Minecraft Text Generator</title>
+  </head>
+<style>
+body, h1,h2,h3,h4,h5,h6 {font-family: "Makinas 4 Flat", sans-serif}
+.w3-row-padding img {margin-bottom: 12px}
+/* Set the width of the sidebar to 120px */
+.w3-sidebar {width: 300px;background: #3C283C;}
+/* Remove margins from "page content" on small screens */
+@media only screen and (max-width: 600px) {#main {margin-left: 0}}
+</style>
+
+  <body id="bg" class="container" style="font-family: Quicksand;">
+    <div id="hexColorTemplate" style="display:none;">
+      <div class="row">
+        <label for="color-$NUM">Color $NUM</label>
+        <input class="col-md-1 hexColor w3-input w3-text-black" id="color-$NUM" style="padding: 5px;" value="$VAL"
+               data-jscolor="{preset:'small dark', position:'right'}" oninput="javascript: updateOutputText(event)"
+               onchange="javascript: updateOutputText(event); Cookies.set(`#${$NUM}`, document.getElementById('color-$NUM').value, { expires: 7, path: '' })"/>
+      </div>
+    </div>
+
+    <div id="content">
+
+      <h1 class="w3-center" id="title">minecraft text generator</h1>
+      <div class="container-fluid">
+        <div class="row">
+          <div class="col-md-2" style="padding-left: 0;">
+            <div id="hexColors" class="w3-container">
+              <!-- Will be populated in Javascript -->
+    </div>
+          </div>
+          <div class="col-md-10" style="padding-right: 0;">
+                          <div class="w3-bar w3-">
+               <div id="appearance" class="w3-bar-item">
+                  <input type="checkbox" class="w3-check w3-hover-purple" id="darkmode" onclick="darkMode();">
+                  <label for="darkmode">dark mode</label>
+                </div>
+                <div class="w3-bar-item w3-hover-red" id="dbold">
+                  <input class="w3-check w3-pink" type="checkbox" id="bold" onclick="updateOutputText(event);" />
+                  <label for="bold"><b>bold</b></label>
+                </div><div class="w3-bar-item w3-hover-blue" id="ditalics">
+                  <input class="w3-check w3-pink" type="checkbox" id="italics" onclick="updateOutputText(event);">
+                  <label for="italics"> italic</label>
+                </div><div class="w3-bar-item w3-hover-green" id="dunderline">
+                  <input class="w3-check w3-pink" type="checkbox" id="underline" onclick="updateOutputText(event);">
+                  <label for="underline">underline</label>
+                </div>
+                <div class="w3-bar-item w3-hover-pink" id="dstrike">
+                  <input class="w3-check w3-pink" type="checkbox" id="strike" onclick="updateOutputText(event);">
+                  <label for="strike">strikethrough</label>
+                </div>
+              </div>
+            <div class="container-fluid">
+              <div class="row" style="padding-bottom: 10px;">
+               <div class="col-md-3" style="padding-left: 0;">
+                  <label for="nickname">message</label>
+                  <input class="w3-input" id="nickname" type="text" maxlength="100" placeholder="hmm?" value="type something!" oninput="javascript: updateOutputText(event);" onchange="javascript: updateOutputText(event)">
+                </div><div class="col-md-3" style="padding-left: 0;">
+                  <label for="color-preset">color preset</label>
+                  <select id="color-preset" class="dark w3-select w3-white" onchange="preset(this.value); updateOutputText(event); ">
+                    <option value="" disabled selected>choose your option</option>
+                    <option value="1">rainbow</option>
+                    <option value="2">pastel rainbow</option>
+                    <option value="3">by the sea</option>
+                    <option value="4">the gust</option>
+                    <option value="5">kart blood new</option>
+                    <option value="6">pink ultra!</option>
+                    <option value="7">serenity</option>
+                    <option value="8">burn!</option>
+                    <option value="9">zyaxx</option>
+                    <option value="10">tropi-</option>
+                  </select>
+                </div><div class="col-md-3" style="padding-left: 0;">
+                  <label for="output-format">output format</label>
+                  <select id="output-format" class="dark w3-select w3-white" onchange="updateOutputText(event);">
+                    <option value="0">default (&amp;#rrggbb)</option>
+                    <option value="2">legacy (&amp;x&amp;r&amp;r&amp;g&amp;g&amp;b&amp;b)</option>
+                    <option value="6">console (§x§r§r§g§g§b§b)</option>
+                    <option value="8">MOTD (\u00A7x)</option>
+                    <option value="1">chat (&lt;#rrggbb&gt;)</option>
+                    <option value="7">bbcode [COLOR=#rrggbb]</option>
+                  </select>
+                </div><div class="row">
+                <label for="numOfColors">Number of Colors</label>
+                <input class="dark w3-input" style="width: 75px;" value="2" id="numOfColors" type="number" min="2" max="10" onchange="updateOutputText(event); toggleColors(this.value);" oninput="updateOutputText(event); toggleColors(this.value);">
+              </div>
+              </div><div class="row">
+            </div>
+          </div>
+                            <div id="output" class="w3-center">
+
+                  <pre id="outputText" onclick="copyTextToClipboard(this.textContent);" style="border-radius: 0px; white-space: pre-wrap; height: 95px; margin-right: 15px; display: none; margin-bottom: 10px;" onclick="copyTextToClipboard(this.textContent);">&amp;#447294T&amp;#507d9fy&amp;#5b89aap&amp;#6794b5e &amp;#72a0c0s&amp;#7eabcbo&amp;#89b6d6m&amp;#97bed9e&amp;#a6c2d4t&amp;#b6c6cfh&amp;#c5cacai&amp;#d5cec6n&amp;#e4d2c1g&amp;#f4d6bc!</pre>
+                  <p id="error" style="display: none;">This is more than 256 characters and may not fit in the chat box.</p>
+                </div>
+              </div>
+              <div class="row">
+                <div id="coloredNick" class="minecraft w3-center w3-hover-opacity" onclick="copyTextToClipboard(document.getElementById('outputText').textContent);"><span style="color: rgb(68, 114, 148);">T</span><span style="color: rgb(80, 125, 159);">y</span><span style="color: rgb(91, 137, 170);">p</span><span style="color: rgb(103, 148, 181);">e</span><span> </span><span style="color: rgb(114, 160, 192);">s</span><span style="color: rgb(126, 171, 203);">o</span><span style="color: rgb(137, 182, 214);">m</span><span style="color: rgb(151, 190, 217);">e</span><span style="color: rgb(166, 194, 212);">t</span><span style="color: rgb(182, 198, 207);">h</span><span style="color: rgb(197, 202, 202);">i</span><span style="color: rgb(213, 206, 198);">n</span><span style="color: rgb(228, 210, 193);">g</span><span style="color: rgb(244, 214, 188);">!</span></div>
+                            <div class="row w3-center">
+                  <button type="button" id="copyText" class="w3-button w3-center w3-hover-pale-blue" onclick="copyTextToClipboard(document.getElementById('outputText').textContent);">
+                  <label id="graylabel2" for="copyText" style="font-weight: normal; padding-right: 10px"><b>click to copy!</b></label></button>
+                </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="jscolor.js"></script>
+    <script src="script.js"></script>
+    </body>
+    <footer>
+      <div class="w3-container w3-display-bottommiddle">
+      <p>created by <a class="w3-hover-pink" href="https://vanillyn.github.io">vanillyn</a>. forked from <a class="w3-hover-blue" href="https://rgb.birdflop.com/">birdflop RGB generator.</a><br>made with <a class="w3-hover-green" href="https://www.w3schools.com/w3css/default.asp">w3.css</a></p>
+    </div>
+    <div class="w3-container w3-display-bottomleft w3-hover-text-blue w3-hover-pale-blue">
+      <i href="https://github.com/vanillyn/rgbgen" class="fa fa-github"></i><a class="w3-hover-text-blue w3-hover-pale-blue" href="https://github.com/vanillyn/rgbgen"> view source on github </a>
+    </div>
+    </footer>
+      </html>
