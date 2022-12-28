@@ -11,7 +11,7 @@
         let htmlString = '<ul>';
         
         for (let file of data) {
-          htmlString += `<button><a href="/${file.name}" style="text-decoration: none;" class="w3-button w3-red">${file.name}</a></button>`;
+          htmlString += `<div><a href="/${file.name}" style="text-decoration: none;" class="w3-button w3-red w3-left">${file.name}</a></div>`;
         }
 
         htmlString += '</ul>';
