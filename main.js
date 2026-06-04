@@ -475,7 +475,9 @@ void main(){
     { label: "twitch", url: "https://twitch.tv/vanillynBot" },
   ];
   const LINKS_FRIENDS = [{ label: "!", url: "https://powuts.straw.page" }];
-  const LINKS_SERVICES = [];
+  const LINKS_SERVICES = [
+    { label: "niskbot", url: "https://vanillyn.github.io/dashboard" },
+  ];
 
   const labelsContainer = document.getElementById("labels-container");
 
@@ -830,7 +832,7 @@ void main(){
     },
     { passive: false },
   );
-  document.addEventListener("click", (e) => {
+  document.addEventListener("click", () => {
     if (iyrsOpen) return;
     raycaster.setFromCamera(mouse, camera);
     const li = raycaster.intersectObjects(clickables);
