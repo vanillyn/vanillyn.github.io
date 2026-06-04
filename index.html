@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>vanillyn</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap"
+            rel="stylesheet"
+        />
+        <link href="main.css" rel="stylesheet" />
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    </head>
+    <body>
+        <div id="ui-layer">
+            <div id="title-block">
+                <div id="title-row">
+                    <span id="name-span">vanillyn</span>
+                    <span id="bio-span">23 · any prns</span>
+                </div>
+                <div id="shader-sub">–</div>
+            </div>
+            <div id="labels-container"></div>
+            <div id="link-tooltip">loading...</div>
+        </div>
+
+        <div id="shader-ctx-menu">
+            <div class="ctx-section-label">meshes</div>
+            <div id="ctx-mesh-tknot">torus knot</div>
+            <div id="ctx-mesh-ico">icosahedron</div>
+            <div id="ctx-mesh-octa">octahedron</div>
+            <div id="ctx-upload-model">upload model (.gltf/.glb)</div>
+            <div class="ctx-divider"></div>
+            <div class="ctx-section-label">shaders</div>
+            <div id="ctx-sh-voxel">voxel</div>
+            <div id="ctx-sh-vhs">vhs</div>
+            <div id="ctx-sh-glass">glass</div>
+            <div id="ctx-sh-noise">noise</div>
+            <div id="ctx-sh-sketch">sketch</div>
+            <div id="ctx-sh-pixelate">pixelate</div>
+            <div id="ctx-sh-lightup">light up</div>
+            <div id="ctx-sh-liquid">liquid</div>
+            <div id="ctx-sh-distort">distorted</div>
+            <div class="ctx-divider"></div>
+            <div id="ctx-upload-shader">upload shader (.glsl)</div>
+        </div>
+
+        <canvas id="post-canvas"></canvas>
+        <input
+            type="file"
+            id="model-upload"
+            accept=".gltf,.glb"
+            style="display: none"
+        />
+        <input
+            type="file"
+            id="shader-upload"
+            accept=".glsl,.frag,.txt"
+            style="display: none"
+        />
+        <div id="canvas-container"></div>
+
+        <div id="hold-ring">
+            <svg width="32" height="32" viewBox="0 0 60 60">
+                <circle class="track" cx="30" cy="30" r="26" />
+                <circle class="prog" id="ring-prog" cx="30" cy="30" r="26" />
+            </svg>
+        </div>
+
+        <div id="vhs-overlay"><canvas id="vhs-canvas"></canvas></div>
+
+        <div id="iyrs-overlay" class="intro">
+            <div id="iy-scanlines"></div>
+            <div id="iy-header">
+                <div id="iy-logo-zone">
+                    <div id="iy-logo-circle">...</div>
+                    <div id="iy-logo-text">...</div>
+                </div>
+                <nav id="iy-nav">
+                    <a href="#" onclick="iyrsNotImpl(event)">about</a>
+                    <a href="#" onclick="iyrsNotImpl(event)">source</a>
+                    <a href="#" onclick="iyrsNotImpl(event)">sign in</a>
+                </nav>
+                <span id="iy-close" onclick="closeIyrs()">✕</span>
+            </div>
+            <div id="iy-body">
+                <div id="iy-sidebar">
+                    <div class="sb-label">statistics</div>
+                    <div class="sb-stat">
+                        uptime <span id="sb-uptime">00:00:00</span>
+                    </div>
+                    <div class="sb-stat">live <span id="sb-nodes">—</span></div>
+                    <div class="sb-stat">
+                        latency <span id="sb-latency">—</span>
+                    </div>
+                    <div class="sb-divider"></div>
+                    <div class="sb-label">chats</div>
+                    <div class="sb-node active" onclick="iyrsNotImpl(event)">
+                        new
+                    </div>
+                    <div class="sb-node" onclick="iyrsNotImpl(event)">
+                        ########### #### ##
+                    </div>
+                    <div class="sb-node" onclick="iyrsNotImpl(event)">
+                        #### ####### #### ##
+                    </div>
+                    <div class="sb-node" onclick="iyrsNotImpl(event)">
+                        ##### ###### #### ##
+                    </div>
+                    <div class="sb-node" onclick="iyrsNotImpl(event)">
+                        ######## ### #### ##
+                    </div>
+                    <div class="sb-node" onclick="iyrsNotImpl(event)">
+                        ########### #### ##
+                    </div>
+                    <div class="sb-node" onclick="iyrsNotImpl(event)">
+                        ########## # #### ##
+                    </div>
+                    <div class="sb-node" onclick="iyrsNotImpl(event)">
+                        ## ### ###### #### ##
+                    </div>
+                    <div class="sb-node" onclick="iyrsNotImpl(event)">
+                        ### ##### ### #### ##
+                    </div>
+                    <div class="sb-node" onclick="iyrsNotImpl(event)">
+                        #### ### #### #### ##
+                    </div>
+                </div>
+                <div id="iy-main">
+                    <div id="iy-greeting">
+                        <div id="iy-greeting-text">...</div>
+                    </div>
+                    <div id="iy-messages"></div>
+                </div>
+            </div>
+            <div id="iy-input-zone">
+                <input
+                    id="iy-input"
+                    type="text"
+                    placeholder="..."
+                    autocomplete="off"
+                    onkeydown="if (event.key === 'Enter') iyrsSubmit();"
+                />
+                <button id="iy-send" onclick="iyrsSubmit()">-></button>
+            </div>
+            <div id="iy-statusbar">
+                <span>must hold the sky</span>
+            </div>
+        </div>
+        <script src="main.js"></script>
+    </body>
+</html>
