@@ -8,6 +8,8 @@ body {
     background: #050505;
     color: #fff;
     font-family: "Share Tech Mono", monospace;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: none;
 }
 
 #canvas-container {
@@ -64,6 +66,7 @@ body {
 #shader-sub:hover {
     color: #999;
 }
+
 .track-label {
     position: absolute;
     top: 0;
@@ -84,6 +87,7 @@ body {
         0 0 20px rgba(255, 255, 255, 0.4);
     transform: translate(var(--tx), var(--ty)) scale(1.15) !important;
 }
+
 #link-tooltip {
     position: absolute;
     bottom: 20px;
@@ -111,6 +115,22 @@ body {
     width: 100vw;
     height: 100vh;
     z-index: 2;
+    pointer-events: none;
+}
+
+#mobile-hint {
+    display: none;
+    position: absolute;
+    bottom: 60px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 10px;
+    color: #555;
+    letter-spacing: 1px;
+    text-align: center;
+    opacity: 1;
+    transition: opacity 1.5s;
+    white-space: nowrap;
     pointer-events: none;
 }
 
@@ -196,7 +216,6 @@ body {
     top: 0;
     left: 0;
 }
-
 #vhs-overlay::before {
     content: "";
     position: absolute;
@@ -463,7 +482,6 @@ body {
     pointer-events: none;
     z-index: 0;
 }
-
 #iy-greeting {
     position: absolute;
     top: 50%;
@@ -601,6 +619,9 @@ body {
     background: #1a3a6e;
     color: #fff;
 }
+#iy-send:active {
+    transform: scale(0.96);
+}
 
 #iy-statusbar {
     background: #aaaaff;
@@ -668,4 +689,69 @@ body {
 }
 #iyrs-overlay.settled #iy-logo-zone {
     transition: all 1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@media (max-width: 600px) {
+    #title-block {
+        top: 8%;
+        left: 8%;
+    }
+    #name-span {
+        font-size: 18px;
+    }
+    #bio-span {
+        font-size: 9px;
+    }
+    .track-label {
+        font-size: 10px;
+    }
+
+    #link-tooltip {
+        bottom: 12px;
+        font-size: 12px;
+        max-width: 80vw;
+        text-align: center;
+    }
+
+    #iy-sidebar {
+        display: none;
+    }
+
+    #iy-nav a {
+        padding: 0 10px;
+        font-size: 11px;
+    }
+    #iy-greeting-text {
+        font-size: 16px;
+    }
+
+    .msg {
+        max-width: 90%;
+        font-size: 12px;
+    }
+
+    #iy-input {
+        font-size: 16px;
+    }
+    #iy-input-zone {
+        padding: 10px 12px;
+    }
+
+    #shader-ctx-menu {
+        font-size: 14px;
+        min-width: 200px;
+    }
+    #shader-ctx-menu div {
+        padding: 10px 16px;
+    }
+}
+
+@media (max-width: 400px) {
+    #name-span {
+        font-size: 15px;
+    }
+    #iy-logo-text {
+        font-size: 14px;
+        letter-spacing: 2px;
+    }
 }

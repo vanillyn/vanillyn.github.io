@@ -2,7 +2,10 @@
 <html lang="en">
     <head>
         <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1.0, user-scalable=no"
+        />
         <title>vanillyn</title>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link
@@ -12,6 +15,7 @@
         <link href="main.css" rel="stylesheet" />
         <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/DRACOLoader.js"></script>
     </head>
     <body>
         <div id="ui-layer">
@@ -24,6 +28,9 @@
             </div>
             <div id="labels-container"></div>
             <div id="link-tooltip">loading...</div>
+            <div id="mobile-hint">
+                hold to open iyrs · pinch to zoom · drag to rotate
+            </div>
         </div>
 
         <div id="shader-ctx-menu">
@@ -43,6 +50,11 @@
             <div id="ctx-sh-lightup">light up</div>
             <div id="ctx-sh-liquid">liquid</div>
             <div id="ctx-sh-distort">distorted</div>
+            <div id="ctx-sh-wireframe">wireframe</div>
+            <div id="ctx-sh-watercolor">watercolor</div>
+            <div id="ctx-sh-motionblur">motion blur</div>
+            <div id="ctx-sh-metallic">metallic</div>
+            <div id="ctx-sh-paint">paint</div>
             <div class="ctx-divider"></div>
             <div id="ctx-upload-shader">upload shader (.glsl)</div>
         </div>
@@ -149,6 +161,7 @@
                 <span>must hold the sky</span>
             </div>
         </div>
-        <script src="main.js"></script>
+
+        <script type="module" src="main.js"></script>
     </body>
 </html>
