@@ -14,9 +14,26 @@ const LINKS_SERVICES = [
 const HUB_FRIENDS_COLOR = "#3af";
 const HUB_SERVICES_COLOR = "#3f9";
 const RETURN_COLOR = "#f44";
-const SECRET_NODE_COLOR = "#ffdd00";
+const data_NODE_COLOR = "#ffdd00";
 
-const SECRET_ENTRIES = [{ label: "placeholder", popup: "placeholder text :3" }];
+const data_ENTRIES = [
+  { label: "placeholder", popup: "placeholder text :3" },
+  {
+    label: "about me",
+    popup:
+      'im vanillyn. i sorta just behave how people like me too. i prioritize being likable over anything else, which is ironic considering how many people dislike me. this includes not really having a gender or sexuality. i am whatever you see me as. id say im good with programming and troubleshooting. i really love computers and really love helping people with it. anything with computers, really. i wish i could say "i do this specific thing and asking me to do anything else wont work" but really i do everything. i dont have many friends, if at all. i wish to be able to talk to people more often in private, because i miss being able to be myself, but i guess people dont want myself. its fine either way. thanks for checking out my website btw. i dont do anything right now, but i promise there will be cool projects.',
+  },
+  {
+    label: "current version",
+    popup: "website version 1.3",
+  },
+
+  {
+    label: "about the website",
+    popup:
+      "this website is sorta just a culmination of me having made websites for a while, i just dont want to have a 'normal' ui and just choose to do this. in small quotes this time because im using big quotes in the code.",
+  },
+];
 
 const NODE_GEOS = [
   () => new THREE.SphereGeometry(0.09, 10, 10),
@@ -32,12 +49,12 @@ export let clickables = [];
 export let labelEls = [];
 export let activeLayer = "me";
 export let hubFriends, hubServices, returnNode;
-export let secretNode = null;
+export let dataNode = null;
 
 let _artifactGroup = null;
-let secretMenuMeshes = [];
-let secretMenuEls = [];
-let secretMenuMats = [];
+let dataMenuMeshes = [];
+let dataMenuEls = [];
+let dataMenuMats = [];
 
 const opacityTweens = new Map();
 
@@ -117,7 +134,7 @@ function buildLayer(links, hexColor, group) {
 
 const popupEl = (() => {
   const el = document.createElement("div");
-  el.id = "secret-popup";
+  el.id = "data-popup";
   el.style.cssText = `
     position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
     background:rgba(5,5,5,0.97);border:1px solid #ffdd00;
@@ -139,18 +156,18 @@ const popupEl = (() => {
   return { el, textNode };
 })();
 
-export function showSecretPopup(text) {
+export function showdataPopup(text) {
   popupEl.textNode.textContent = text;
   popupEl.el.style.display = "block";
 }
 
-function buildSecretMenu(group) {
-  if (secretMenuMeshes.length) return;
-  SECRET_ENTRIES.forEach((entry, i) => {
-    const mat = makeLineMat(SECRET_NODE_COLOR, 0);
+function builddataMenu(group) {
+  if (dataMenuMeshes.length) return;
+  data_ENTRIES.forEach((entry, i) => {
+    const mat = makeLineMat(data_NODE_COLOR, 0);
     allLayerMats.push(mat);
-    secretMenuMats.push(mat);
-    const angle = (i / SECRET_ENTRIES.length) * Math.PI * 2;
+    dataMenuMats.push(mat);
+    const angle = (i / data_ENTRIES.length) * Math.PI * 2;
     const r = 2.5;
     const pos = new THREE.Vector3(
       Math.cos(angle) * r,
@@ -160,18 +177,18 @@ function buildSecretMenu(group) {
     const node = new THREE.Mesh(new THREE.IcosahedronGeometry(0.13, 1), mat);
     node.position.copy(pos);
     node.userData = {
-      isSecretEntry: true,
+      isdataEntry: true,
       label: entry.label,
       popup: entry.popup,
     };
     group.add(node);
-    secretMenuMeshes.push(node);
+    dataMenuMeshes.push(node);
     const div = document.createElement("div");
     div.className = "track-label";
     div.innerText = entry.label;
     div.style.color = "#ffdd00";
     labelsContainer.appendChild(div);
-    secretMenuEls.push({ mesh: node, el: div });
+    dataMenuEls.push({ mesh: node, el: div });
   });
 }
 
@@ -213,18 +230,18 @@ export function initNav(artifactGroup) {
     }
   }
 
-  const smat = makeLineMat(SECRET_NODE_COLOR, 0.8);
+  const smat = makeLineMat(data_NODE_COLOR, 0.8);
   allLayerMats.push(smat);
   const snode = new THREE.Mesh(new THREE.OctahedronGeometry(0.12, 0), smat);
   snode.position.set(2.1, -1.9, 0.3);
-  snode.userData = { isSecretNode: true, label: "data" };
+  snode.userData = { isdataNode: true, label: "data" };
   artifactGroup.add(snode);
   const sdiv = document.createElement("div");
   sdiv.className = "track-label";
   sdiv.innerText = "data";
   sdiv.style.color = "#ffdd00";
   labelsContainer.appendChild(sdiv);
-  secretNode = { mesh: snode, el: sdiv, mat: smat };
+  dataNode = { mesh: snode, el: sdiv, mat: smat };
 
   fadeMat(layers.me.mat, 1, 0.03);
   fadeMat(hubFriends.mat, 0.7, 0.03);
@@ -253,7 +270,7 @@ export function activateMe(restoreModel) {
   if (layers.services) fadeMat(layers.services.mat, 0, 0.05);
   if (returnNode) fadeMat(returnNode.mat, 0, 0.05);
 
-  secretMenuMats.forEach((m) => fadeMat(m, 0, 0.05));
+  dataMenuMats.forEach((m) => fadeMat(m, 0, 0.05));
 
   if (restoreModel) restoreModel();
   updateClickables();
@@ -272,7 +289,7 @@ export function activateFriends(artifactGroup) {
   fadeMat(hubServices.mat, 0, 0.05);
   fadeMat(layers.friends.mat, 1, 0.05);
   if (layers.services) fadeMat(layers.services.mat, 0, 0.05);
-  secretMenuMats.forEach((m) => fadeMat(m, 0, 0.05));
+  dataMenuMats.forEach((m) => fadeMat(m, 0, 0.05));
   ensureReturn(artifactGroup);
   fadeMat(returnNode.mat, 0.8, 0.05);
   updateClickables();
@@ -291,23 +308,23 @@ export function activateServices(artifactGroup) {
   fadeMat(hubServices.mat, 0, 0.05);
   if (layers.friends) fadeMat(layers.friends.mat, 0, 0.05);
   fadeMat(layers.services.mat, 1, 0.05);
-  secretMenuMats.forEach((m) => fadeMat(m, 0, 0.05));
+  dataMenuMats.forEach((m) => fadeMat(m, 0, 0.05));
   ensureReturn(artifactGroup);
   fadeMat(returnNode.mat, 0.8, 0.05);
   updateClickables();
 }
 
-export function activateSecretMenu(artifactGroup) {
-  buildSecretMenu(artifactGroup);
-  activeLayer = "secret";
+export function activatedataMenu(artifactGroup) {
+  builddataMenu(artifactGroup);
+  activeLayer = "data";
   fadeMat(layers.me.mat, 0, 0.05);
   fadeMat(hubFriends.mat, 0, 0.05);
   fadeMat(hubServices.mat, 0, 0.05);
   if (layers.friends) fadeMat(layers.friends.mat, 0, 0.05);
   if (layers.services) fadeMat(layers.services.mat, 0, 0.05);
-  secretMenuMats.forEach((m) => fadeMat(m, 1, 0.05));
+  dataMenuMats.forEach((m) => fadeMat(m, 1, 0.05));
 
-  if (secretNode) fadeMat(secretNode.mat, 0, 0.05);
+  if (dataNode) fadeMat(dataNode.mat, 0, 0.05);
   ensureReturn(artifactGroup);
   returnNode.mesh.userData = { isReturn: true, label: "← return" };
   fadeMat(returnNode.mat, 0.8, 0.05);
@@ -324,13 +341,13 @@ function updateClickables() {
       hubFriends.mesh,
       hubServices.mesh,
     );
-    if (secretNode) clickables.push(secretNode.mesh);
+    if (dataNode) clickables.push(dataNode.mesh);
     labelEls.push(
       ...layers.me.labelEls,
       { mesh: hubFriends.mesh, el: hubFriends.el },
       { mesh: hubServices.mesh, el: hubServices.el },
     );
-    if (secretNode) labelEls.push({ mesh: secretNode.mesh, el: secretNode.el });
+    if (dataNode) labelEls.push({ mesh: dataNode.mesh, el: dataNode.el });
   } else if (activeLayer === "friends") {
     clickables.push(...layers.friends.clickableNodes);
     if (returnNode) clickables.push(returnNode.mesh);
@@ -341,10 +358,10 @@ function updateClickables() {
     if (returnNode) clickables.push(returnNode.mesh);
     labelEls.push(...layers.services.labelEls);
     if (returnNode) labelEls.push({ mesh: returnNode.mesh, el: returnNode.el });
-  } else if (activeLayer === "secret") {
-    clickables.push(...secretMenuMeshes);
+  } else if (activeLayer === "data") {
+    clickables.push(...dataMenuMeshes);
     if (returnNode) clickables.push(returnNode.mesh);
-    labelEls.push(...secretMenuEls);
+    labelEls.push(...dataMenuEls);
     if (returnNode) labelEls.push({ mesh: returnNode.mesh, el: returnNode.el });
   }
 
@@ -356,8 +373,8 @@ function updateClickables() {
     { el: hubFriends?.el },
     { el: hubServices?.el },
     ...(returnNode ? [{ el: returnNode.el }] : []),
-    ...secretMenuEls,
-    ...(secretNode ? [{ el: secretNode.el }] : []),
+    ...dataMenuEls,
+    ...(dataNode ? [{ el: dataNode.el }] : []),
   ];
   allEls.forEach(({ el }) => {
     if (!el) return;

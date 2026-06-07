@@ -1,15 +1,41 @@
+@import url("https://fonts.googleapis.com/css2?family=Geist+Mono:wght@300;400;500&family=Geist:wght@300;400;600&display=swap");
+
+:root {
+    --bg: #050505;
+    --fg: #fff;
+    --fg-dim: #666;
+    --fg-muted: #333;
+    --accent: #4af;
+    --border: rgba(255, 255, 255, 0.1);
+    --surface: rgba(8, 8, 8, 0.97);
+}
+
+:root.light {
+    --bg: #f2f0eb;
+    --fg: #111;
+    --fg-dim: #777;
+    --fg-muted: #bbb;
+    --accent: #1a6fcc;
+    --border: rgba(0, 0, 0, 0.12);
+    --surface: rgba(242, 240, 235, 0.98);
+}
+
 * {
     box-sizing: border-box;
     margin: 0;
     padding: 0;
 }
+
 body {
     overflow: hidden;
-    background: #050505;
-    color: #fff;
-    font-family: "Share Tech Mono", monospace;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: "Geist Mono", monospace;
     -webkit-tap-highlight-color: transparent;
     touch-action: none;
+    transition:
+        background 0.4s,
+        color 0.4s;
 }
 
 #canvas-container {
@@ -42,50 +68,67 @@ body {
     gap: 10px;
 }
 #name-span {
-    font-size: 24px;
-    letter-spacing: 2px;
-    text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+    font-size: 22px;
+    letter-spacing: 1px;
+    font-weight: 500;
+    color: var(--fg);
+    text-shadow: 0 0 18px rgba(255, 255, 255, 0.15);
     cursor: pointer;
+    transition:
+        text-shadow 0.2s,
+        color 0.4s;
+}
+:root.light #name-span {
+    text-shadow: 0 0 18px rgba(0, 0, 0, 0.08);
 }
 #name-span:hover {
-    text-shadow: 0 0 20px rgba(255, 255, 255, 0.6);
+    text-shadow: 0 0 28px rgba(255, 255, 255, 0.45);
+}
+:root.light #name-span:hover {
+    text-shadow: 0 0 12px rgba(26, 111, 204, 0.3);
 }
 #bio-span {
-    font-size: 11px;
-    color: #888;
-    letter-spacing: 1px;
+    font-size: 10px;
+    color: var(--fg-dim);
+    letter-spacing: 2px;
     pointer-events: none;
+    transition: color 0.4s;
 }
 #shader-sub {
-    font-size: 10px;
-    color: #555;
-    margin-top: 3px;
-    letter-spacing: 1px;
+    font-size: 9px;
+    color: var(--fg-muted);
+    margin-top: 2px;
+    letter-spacing: 2px;
     cursor: pointer;
+    transition: color 0.15s;
 }
 #shader-sub:hover {
-    color: #999;
+    color: var(--fg-dim);
 }
 
 .track-label {
     position: absolute;
     top: 0;
     left: 0;
-    font-size: 12px;
+    font-size: 11px;
     pointer-events: none;
     white-space: nowrap;
-    color: #aaa;
+    color: var(--fg-dim);
     transition:
-        color 0.15s,
-        text-shadow 0.15s,
-        transform 0.15s;
+        color 0.12s,
+        text-shadow 0.12s,
+        transform 0.12s,
+        opacity 0.2s;
 }
 .track-label.hovered {
-    color: #fff;
+    color: var(--fg);
     text-shadow:
-        0 0 8px rgba(255, 255, 255, 0.8),
-        0 0 20px rgba(255, 255, 255, 0.4);
-    transform: translate(var(--tx), var(--ty)) scale(1.15) !important;
+        0 0 10px rgba(255, 255, 255, 0.6),
+        0 0 24px rgba(255, 255, 255, 0.25);
+    transform: translate(var(--tx), var(--ty)) scale(1.12) !important;
+}
+:root.light .track-label.hovered {
+    text-shadow: 0 0 8px rgba(26, 111, 204, 0.4);
 }
 
 #link-tooltip {
@@ -93,14 +136,15 @@ body {
     bottom: 20px;
     left: 50%;
     transform: translateX(-50%);
-    font-size: 14px;
+    font-size: 12px;
     opacity: 0;
     transition: opacity 0.2s;
-    color: #000;
-    background: rgba(255, 255, 255, 0.9);
-    padding: 5px 15px;
-    border: 1px solid #fff;
+    color: var(--bg);
+    background: var(--fg);
+    padding: 4px 14px;
+    letter-spacing: 1px;
 }
+
 #labels-container {
     position: absolute;
     top: 0;
@@ -123,8 +167,8 @@ body {
     bottom: 60px;
     left: 50%;
     transform: translateX(-50%);
-    font-size: 10px;
-    color: #555;
+    font-size: 9px;
+    color: var(--fg-muted);
     letter-spacing: 1px;
     text-align: center;
     opacity: 1;
@@ -135,92 +179,99 @@ body {
 
 #shader-ctx-menu {
     position: fixed;
-    background: rgba(8, 8, 8, 0.97);
-    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: var(--surface);
+    border: 1px solid var(--border);
     padding: 4px 0;
-    font-size: 12px;
-    font-family: monospace;
-    color: #ccc;
+    font-size: 11px;
+    font-family: "Geist Mono", monospace;
+    color: var(--fg-dim);
     z-index: 100;
     display: none;
-    min-width: 240px;
+    min-width: 220px;
     max-height: 80vh;
     overflow-y: auto;
+    transition:
+        background 0.4s,
+        border-color 0.4s;
 }
 #shader-ctx-menu
     > div:not(#shader-grid):not(.ctx-section-label):not(.ctx-divider) {
-    padding: 7px 14px;
+    padding: 6px 14px;
     cursor: pointer;
 }
 #shader-ctx-menu
     > div:not(#shader-grid):not(.ctx-section-label):not(.ctx-divider):hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: #fff;
+    background: var(--border);
+    color: var(--fg);
 }
 .ctx-section-label {
-    font-size: 9px;
-    color: #555;
+    font-size: 8px;
+    color: var(--fg-muted);
     letter-spacing: 2px;
-    padding: 8px 14px 3px !important;
+    padding: 7px 14px 2px !important;
     cursor: default !important;
     text-transform: uppercase;
 }
-.ctx-section-label:hover {
-    background: none !important;
-    color: #555 !important;
-}
 .ctx-active-item {
-    color: #4af !important;
+    color: var(--accent) !important;
 }
 .ctx-divider {
     height: 1px;
-    background: rgba(255, 255, 255, 0.08);
-    margin: 4px 0;
+    background: var(--border);
+    margin: 3px 0;
 }
 
 #shader-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 3px;
-    padding: 6px 8px;
+    padding: 5px 7px;
 }
 .shader-grid-cell {
     aspect-ratio: 1;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border);
     cursor: pointer;
     display: flex;
     align-items: flex-end;
     justify-content: center;
-    padding: 4px 2px;
-    position: relative;
+    padding: 3px 2px;
     transition:
         background 0.1s,
         border-color 0.1s;
     min-height: 44px;
+    position: relative;
+    overflow: hidden;
 }
 .shader-grid-cell:hover {
-    background: rgba(255, 255, 255, 0.1);
     border-color: rgba(255, 255, 255, 0.3);
 }
+:root.light .shader-grid-cell {
+    background: rgba(0, 0, 0, 0.03);
+}
+:root.light .shader-grid-cell:hover {
+    border-color: rgba(0, 0, 0, 0.2);
+}
 .shader-grid-cell.ctx-active-item {
-    border-color: #4af;
-    background: rgba(68, 170, 255, 0.1);
+    border-color: var(--accent);
 }
 .shader-grid-label {
-    font-size: 8px;
-    color: #888;
+    font-size: 7px;
+    color: #ddd;
     letter-spacing: 0.5px;
     text-align: center;
     line-height: 1.2;
-    pointer-events: none;
+    position: relative;
+    z-index: 1;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
     transition: color 0.1s;
 }
-.shader-grid-cell:hover .shader-grid-label {
-    color: #fff;
+:root.light .shader-grid-label {
+    color: #111;
+    text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
 }
 .shader-grid-cell.ctx-active-item .shader-grid-label {
-    color: #4af;
+    color: var(--accent);
 }
 
 #hold-ring {
@@ -234,12 +285,12 @@ body {
 }
 #hold-ring circle.track {
     fill: none;
-    stroke: rgba(255, 255, 255, 0.1);
+    stroke: rgba(255, 255, 255, 0.08);
     stroke-width: 2;
 }
 #hold-ring circle.prog {
     fill: none;
-    stroke: #4af;
+    stroke: var(--accent);
     stroke-width: 2;
     stroke-dasharray: 0 188;
     transition: stroke-dasharray 0.05s linear;
@@ -288,7 +339,7 @@ body {
     left: -4px;
     right: -4px;
     bottom: -4px;
-    border-radius: 50% / 8px;
+    border-radius: 50%/8px;
     box-shadow:
         inset 0 0 0 6px rgba(0, 0, 0, 0.85),
         inset 0 6px 18px rgba(0, 0, 0, 0.7),
@@ -309,7 +360,7 @@ body {
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.5s ease;
-    font-family: "serif", sans-serif;
+    font-family: "Geist", sans-serif;
     background: #fafdee;
     display: flex;
     flex-direction: column;
@@ -320,7 +371,7 @@ body {
 }
 
 #iy-header {
-    background: #ffffff;
+    background: #fff;
     border-bottom: 2px solid #1a3a6e;
     display: flex;
     align-items: center;
@@ -348,7 +399,6 @@ body {
         background-position: 200% 0;
     }
 }
-
 #iy-logo-zone {
     display: flex;
     align-items: center;
@@ -372,10 +422,11 @@ body {
 }
 #iy-logo-text {
     font-size: 18px;
-    font-weight: 700;
+    font-weight: 600;
     color: #c8deff;
     letter-spacing: 3px;
     text-transform: uppercase;
+    font-family: "Geist Mono", monospace;
 }
 #iy-nav {
     display: flex;
@@ -384,30 +435,30 @@ body {
 }
 #iy-nav a {
     color: #7aaad4;
-    font-size: 13px;
+    font-size: 12px;
     letter-spacing: 1px;
     text-decoration: none;
-    padding: 0 18px;
+    padding: 0 16px;
     height: 48px;
     display: flex;
     align-items: center;
-    border-left: 1px solid rgba(74, 170, 255, 0.12);
+    border-left: 1px solid rgba(74, 170, 255, 0.1);
     transition:
         color 0.15s,
         background 0.15s;
-    font-weight: 600;
+    font-weight: 500;
     text-transform: uppercase;
 }
 #iy-nav a:hover {
     color: #fff;
-    background: rgba(74, 170, 255, 0.08);
+    background: rgba(74, 170, 255, 0.06);
 }
 #iy-close {
     color: #4af;
     font-size: 18px;
     cursor: pointer;
     padding: 0 8px;
-    opacity: 0.6;
+    opacity: 0.5;
     transition: opacity 0.15s;
     user-select: none;
     font-weight: 300;
@@ -423,13 +474,13 @@ body {
     min-height: 0;
 }
 #iy-sidebar {
-    width: 200px;
+    width: 190px;
     flex-shrink: 0;
-    background: #ffffff;
+    background: #fff;
     border-right: 1px solid #1a3a6e;
     display: flex;
     flex-direction: column;
-    padding: 16px 0;
+    padding: 14px 0;
     position: relative;
     overflow: hidden;
 }
@@ -442,47 +493,50 @@ body {
     bottom: 0;
     background: repeating-linear-gradient(
         0deg,
-        rgba(74, 170, 255, 0.02) 0px,
-        rgba(74, 170, 255, 0.02) 1px,
+        rgba(74, 170, 255, 0.018) 0px,
+        rgba(74, 170, 255, 0.018) 1px,
         transparent 1px,
         transparent 4px
     );
     pointer-events: none;
 }
 .sb-label {
-    font-size: 9px;
+    font-size: 8px;
     color: #2a5a8e;
     letter-spacing: 2px;
-    padding: 0 16px 6px;
+    padding: 0 16px 5px;
     text-transform: uppercase;
+    font-family: "Geist Mono", monospace;
 }
 .sb-stat {
-    padding: 4px 16px;
-    font-size: 11px;
+    padding: 3px 16px;
+    font-size: 10px;
     color: #4a7aaa;
     display: flex;
     justify-content: space-between;
     align-items: center;
+    font-family: "Geist Mono", monospace;
 }
 .sb-stat span {
     color: #4af;
-    font-size: 12px;
+    font-size: 11px;
     font-variant-numeric: tabular-nums;
 }
 .sb-divider {
     height: 1px;
     background: #1a3a6e;
-    margin: 10px 16px;
+    margin: 8px 16px;
 }
 .sb-node {
     margin: 2px 8px;
-    padding: 5px 10px;
-    font-size: 10px;
+    padding: 4px 10px;
+    font-size: 9px;
     color: #2a5a8e;
     border: 1px solid transparent;
     cursor: pointer;
     transition: all 0.15s;
     letter-spacing: 1px;
+    font-family: "Geist Mono", monospace;
 }
 .sb-node:hover {
     color: #4af;
@@ -492,7 +546,7 @@ body {
 .sb-node.active {
     color: #4af;
     border-color: #1a4a8e;
-    background: rgba(74, 170, 255, 0.08);
+    background: rgba(74, 170, 255, 0.07);
 }
 
 #iy-main {
@@ -512,18 +566,13 @@ body {
     height: 100%;
     background:
         radial-gradient(
-            ellipse 38% 38% at 0% 0%,
-            rgba(44, 130, 255, 0.22) 0%,
+            ellipse 40% 40% at 0% 0%,
+            rgba(44, 130, 255, 0.2) 0%,
             transparent 100%
         ),
         radial-gradient(
-            ellipse 18% 18% at 0% 0%,
-            rgba(74, 170, 255, 0.18) 0%,
-            transparent 100%
-        ),
-        radial-gradient(
-            ellipse 8% 8% at 0% 0%,
-            rgba(120, 200, 255, 0.28) 0%,
+            ellipse 15% 15% at 0% 0%,
+            rgba(74, 170, 255, 0.15) 0%,
             transparent 100%
         );
     pointer-events: none;
@@ -543,12 +592,13 @@ body {
     opacity: 0;
 }
 #iy-greeting-text {
-    font-size: 22px;
+    font-size: 20px;
     font-weight: 600;
     color: #1a4a8e;
-    letter-spacing: 3px;
+    letter-spacing: 4px;
     text-transform: uppercase;
     animation: greetPulse 4s ease-in-out infinite;
+    font-family: "Geist Mono", monospace;
 }
 @keyframes greetPulse {
     0%,
@@ -557,41 +607,41 @@ body {
     }
     50% {
         color: #2a7aee;
-        text-shadow: 0 0 20px rgba(74, 170, 255, 0.3);
+        text-shadow: 0 0 20px rgba(74, 170, 255, 0.25);
     }
 }
 #iy-greeting-sub {
-    font-size: 10px;
+    font-size: 9px;
     color: #0e2a4e;
     letter-spacing: 2px;
-    margin-top: 6px;
+    margin-top: 5px;
+    font-family: "Geist Mono", monospace;
 }
-
 #iy-messages {
     flex: 1;
     overflow-y: auto;
-    padding: 20px 24px;
+    padding: 18px 22px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 10px;
     scrollbar-width: thin;
     scrollbar-color: #1a3a6e transparent;
 }
 #iy-messages::-webkit-scrollbar {
-    width: 4px;
+    width: 3px;
 }
 #iy-messages::-webkit-scrollbar-thumb {
     background: #1a3a6e;
     border-radius: 2px;
 }
-
 .msg {
     max-width: 70%;
-    padding: 10px 14px;
-    font-size: 13px;
-    line-height: 1.5;
+    padding: 9px 13px;
+    font-size: 12px;
+    line-height: 1.55;
     position: relative;
-    border-radius: 8px;
+    border-radius: 6px;
+    font-family: "Geist", sans-serif;
 }
 .msg.user {
     align-self: flex-end;
@@ -608,25 +658,26 @@ body {
     border-bottom-left-radius: 2px;
     background-image: radial-gradient(
         ellipse at center,
-        rgba(74, 170, 255, 0.07) 0%,
+        rgba(74, 170, 255, 0.06) 0%,
         rgba(7, 10, 17, 0) 70%
     );
 }
 .msg.ai::before {
     content: "iyrs:";
     position: absolute;
-    top: -18px;
+    top: -17px;
     left: 0;
-    font-size: 9px;
+    font-size: 8px;
     color: #1a4a8e;
     letter-spacing: 2px;
+    font-family: "Geist Mono", monospace;
 }
 
 #iy-input-zone {
     border-top: 1px solid #1a3a6e;
-    padding: 14px 20px;
+    padding: 12px 18px;
     display: flex;
-    gap: 10px;
+    gap: 9px;
     align-items: center;
     background: #ccccff;
     flex-shrink: 0;
@@ -636,29 +687,29 @@ body {
     background: #eeeeff;
     border: 1px solid #1a3a6e;
     color: #c8deff;
-    font-family: "serif", monospace;
-    font-size: 13px;
-    padding: 10px 14px;
+    font-family: "Geist", serif;
+    font-size: 12px;
+    padding: 9px 13px;
     outline: none;
-    border-radius: 6px;
+    border-radius: 4px;
     transition: border-color 0.15s;
 }
 #iy-input:focus {
     border-color: #4af;
 }
 #iy-input::placeholder {
-    color: #333344;
+    color: #3a3a66;
 }
 #iy-send {
     background: #ddddff;
     border: 1px solid #1a4a8e;
     color: #4af;
-    font-family: "serif", monospace;
-    font-size: 11px;
-    padding: 10px 16px;
+    font-family: "Geist Mono", monospace;
+    font-size: 10px;
+    padding: 9px 14px;
     cursor: pointer;
     letter-spacing: 2px;
-    border-radius: 6px;
+    border-radius: 4px;
     transition: all 0.15s;
     text-transform: uppercase;
 }
@@ -666,20 +717,17 @@ body {
     background: #1a3a6e;
     color: #fff;
 }
-#iy-send:active {
-    transform: scale(0.96);
-}
-
 #iy-statusbar {
     background: #aaaaff;
     border-top: 1px solid #0e2040;
-    padding: 3px 24px;
-    font-size: 9px;
+    padding: 3px 22px;
+    font-size: 8px;
     color: #1a3a6e;
     display: flex;
-    gap: 24px;
+    gap: 22px;
     letter-spacing: 1px;
     flex-shrink: 0;
+    font-family: "Geist Mono", monospace;
 }
 #iy-statusbar span {
     color: #0a2050;
@@ -702,8 +750,8 @@ body {
     height: 100%;
     background: repeating-linear-gradient(
         0deg,
-        rgba(0, 0, 0, 0.04) 0px,
-        rgba(0, 0, 0, 0.04) 1px,
+        rgba(0, 0, 0, 0.035) 0px,
+        rgba(0, 0, 0, 0.035) 1px,
         transparent 1px,
         transparent 2px
     );
@@ -728,9 +776,7 @@ body {
     font-size: 36px;
     letter-spacing: 8px;
 }
-#iyrs-overlay.intro #iy-nav {
-    display: none;
-}
+#iyrs-overlay.intro #iy-nav,
 #iyrs-overlay.intro #iy-close {
     display: none;
 }
@@ -744,7 +790,7 @@ body {
         left: 8%;
     }
     #name-span {
-        font-size: 18px;
+        font-size: 17px;
     }
     #bio-span {
         font-size: 9px;
@@ -754,7 +800,7 @@ body {
     }
     #link-tooltip {
         bottom: 12px;
-        font-size: 12px;
+        font-size: 11px;
         max-width: 80vw;
         text-align: center;
     }
@@ -762,25 +808,18 @@ body {
         display: none;
     }
     #iy-nav a {
-        padding: 0 10px;
-        font-size: 11px;
+        padding: 0 9px;
+        font-size: 10px;
     }
     #iy-greeting-text {
-        font-size: 16px;
+        font-size: 15px;
     }
     .msg {
         max-width: 90%;
-        font-size: 12px;
+        font-size: 11px;
     }
     #iy-input {
         font-size: 16px;
-    }
-    #iy-input-zone {
-        padding: 10px 12px;
-    }
-    #shader-ctx-menu {
-        font-size: 14px;
-        min-width: 200px;
     }
     #shader-grid {
         grid-template-columns: repeat(3, 1fr);
@@ -788,7 +827,7 @@ body {
 }
 @media (max-width: 400px) {
     #name-span {
-        font-size: 15px;
+        font-size: 14px;
     }
     #iy-logo-text {
         font-size: 14px;

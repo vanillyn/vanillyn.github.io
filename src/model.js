@@ -4,9 +4,15 @@ export const FALLBACK_GEOS = [
   () => new THREE.TorusKnotGeometry(1, 0.32, 128, 32),
   () => new THREE.IcosahedronGeometry(1.2, 1),
   () => new THREE.OctahedronGeometry(1.4, 0),
+  () => new THREE.SphereGeometry(1, 32, 16),
+  () => new THREE.ConeGeometry(1, 2, 32),
+  () => new THREE.DodecahedronGeometry(1.2),
 ];
 
-export const STARTUP_MODELS = [];
+export const STARTUP_MODELS = [
+  "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Duck/glTF/Duck.gltf",
+  "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/CesiumMilkTruck/glTF/CesiumMilkTruck.gltf",
+];
 
 export let modelGroup = null;
 
@@ -80,10 +86,17 @@ export function getModelGroup() {
 }
 
 export function loadStartupModel() {
-  if (STARTUP_MODELS.length === 0) {
-    spawnFallback();
+  const totalLength = STARTUP_MODELS.length + FALLBACK_GEOS.length;
+
+  if (totalLength === 0) {
     return;
   }
-  const url = STARTUP_MODELS[Math.floor(Math.random() * STARTUP_MODELS.length)];
-  loadGLTF(url);
+
+  const randomIndex = Math.floor(Math.random() * totalLength);
+
+  if (randomIndex < STARTUP_MODELS.length) {
+    loadGLTF(STARTUP_MODELS[randomIndex]);
+  } else {
+    spawnFallback(FALLBACK_GEOS[randomIndex - STARTUP_MODELS.length]);
+  }
 }

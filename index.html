@@ -9,7 +9,7 @@
         <title>vanillyn</title>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link
-            href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap"
+            href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@300;400;500&family=Geist:wght@300;400;600&display=swap"
             rel="stylesheet"
         />
         <link href="main.css" rel="stylesheet" />
@@ -34,19 +34,23 @@
         </div>
 
         <div id="shader-ctx-menu">
-            <div class="ctx-section-label">meshes</div>
+            <div class="ctx-section-label">mesh</div>
             <div id="ctx-mesh-tknot">torus knot</div>
             <div id="ctx-mesh-ico">icosahedron</div>
             <div id="ctx-mesh-octa">octahedron</div>
+            <div id="ctx-mesh-ball">sphere</div>
+            <div id="ctx-mesh-cone">cone</div>
+            <div id="ctx-mesh-dode">dodecahedron</div>
+            <div id="ctx-mesh-duck">duck</div>
+            <div id="ctx-mesh-milk">milk truck</div>
             <div id="ctx-upload-model">upload model (.gltf/.glb)</div>
             <div class="ctx-divider"></div>
-            <div class="ctx-section-label">shaders</div>
+            <div class="ctx-section-label">shader</div>
             <div id="shader-grid"></div>
             <div class="ctx-divider"></div>
-            <div class="ctx-section-label">background</div>
-            <div id="ctx-god-rays">always show unlock glow</div>
-            <div class="ctx-divider"></div>
             <div id="ctx-upload-shader">upload shader (.glsl)</div>
+            <div class="ctx-divider"></div>
+            <div id="ctx-theme">light mode</div>
         </div>
 
         <canvas id="post-canvas"></canvas>
@@ -147,9 +151,7 @@
                 />
                 <button id="iy-send" onclick="iyrsSubmit()">-></button>
             </div>
-            <div id="iy-statusbar">
-                <span>must hold the sky</span>
-            </div>
+            <div id="iy-statusbar"><span>must hold the sky</span></div>
         </div>
 
         <script type="module" src="main.js"></script>
