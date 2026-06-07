@@ -15,9 +15,10 @@ export const bgMat = new THREE.ShaderMaterial({
   uniforms: {
     time: { value: 0 },
     uMouse: { value: new THREE.Vector2(0.5, 0.5) },
+    uGodRays: { value: 0.0 },
   },
   vertexShader: `varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`,
-  fragmentShader: `uniform float time;uniform vec2 uMouse;varying vec2 vUv;
+  fragmentShader: `uniform float time;uniform vec2 uMouse;uniform float uGodRays;varying vec2 vUv;
 void main(){
   vec2 uv=vUv*30.0,grid=fract(uv)-.5;
   float dots=smoothstep(.15,.05,length(grid));
@@ -28,6 +29,22 @@ void main(){
   float glow=smoothstep(.22,.0,distance(vUv,uMouse));
   vec3 c=mix(vec3(.02),vec3(.15),max(dots*pulse,lines*.3));
   c=mix(c,vec3(.35),max(dots,lx+ly)*glow);
+
+  if(uGodRays>0.001){
+    vec2 lightPos=uMouse;
+    vec2 dir=vUv-lightPos;
+    float dist=length(dir);
+    float angle=atan(dir.y,dir.x);
+    float rays=0.;
+    for(int i=0;i<8;i++){
+      float a=float(i)*0.7854+time*0.2;
+      float diff=abs(mod(angle-a+3.14159,6.28318)-3.14159);
+      rays+=smoothstep(.3,.0,diff)*smoothstep(1.2,.0,dist)*uGodRays;
+    }
+    float radial=pow(max(0.,1.-dist*1.5),2.)*uGodRays*0.4;
+    c+=vec3(.3,.6,1.)*rays*0.3+vec3(.2,.4,.8)*radial;
+  }
+
   gl_FragColor=vec4(c,1.);}`,
   depthWrite: false,
 });
@@ -44,13 +61,24 @@ export const vhsMat = new THREE.ShaderMaterial({
   fragmentShader: `uniform float time;varying vec3 vNormal,vPos;void main(){float l=dot(normalize(vNormal),normalize(vec3(1,1,1)))*.5+.5;float sc=sin(gl_FragCoord.y*.5-time*10.)*.2+.8;vec3 c=vec3(l);if(sin(time*2.)>0.){c.r+=l*step(.1,sin(vPos.y*50.+time*5.))*.2;c.b+=l*step(.1,cos(vPos.y*40.-time*5.))*.2;}gl_FragColor=vec4(c*sc,1.);}`,
 });
 
-export const glassMat = new THREE.MeshPhysicalMaterial({
-  color: 0xffffff,
-  metalness: 0.1,
-  roughness: 0.05,
+export const glassMat = new THREE.ShaderMaterial({
+  uniforms: { time: { value: 0 }, ...hoverU },
+  vertexShader: VERT_SIMPLE,
+  fragmentShader: `uniform float time;uniform float uHoverStrength;varying vec3 vNormal,vPos;varying vec2 vUv;
+void main(){
+  vec3 n=normalize(vNormal);
+  vec3 viewDir=normalize(vec3(0,0,1));
+  float fresnel=pow(1.-abs(dot(n,viewDir)),3.);
+  float refr=dot(n,normalize(vec3(sin(time*.3),cos(time*.2),1.)))*.5+.5;
+  vec3 envCol=mix(vec3(0.05,0.08,0.12),vec3(0.6,0.8,1.0),fresnel);
+  vec3 refractCol=mix(vec3(0.1,0.15,0.2),vec3(0.8,0.9,1.0),refr);
+  float spec=pow(max(0.,dot(reflect(-normalize(vec3(1,1.5,2.)),n),viewDir)),64.)*1.2;
+  vec3 col=mix(refractCol,envCol,fresnel*0.8)+spec*vec3(1.0);
+  col=mix(col,vec3(0.5,0.8,1.0)*col,uHoverStrength*0.5);
+  gl_FragColor=vec4(col,0.35+fresnel*0.5+spec*0.3);}`,
   transparent: true,
-  opacity: 0.25,
   side: THREE.DoubleSide,
+  depthWrite: false,
 });
 
 export const contourMat = new THREE.ShaderMaterial({
@@ -100,15 +128,13 @@ export const wireframeMat = new THREE.ShaderMaterial({
   vertexShader: `attribute vec3 aBary;varying vec3 vBary;varying vec3 vPos;void main(){vBary=aBary;vPos=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
   fragmentShader: `uniform float time;varying vec3 vBary;varying vec3 vPos;
 void main(){
-  float e=min(min(vBary.x,vBary.y),vBary.z);
-  float edge=1.0-smoothstep(0.0,0.025,e);
-  if(edge<0.01) discard;
-  float pulse=sin(vPos.y*6.-time*3.)*.3+.7;
-  vec3 col=vec3(0.25,0.85,1.0)*pulse;
-
-  float vdot=step(0.92,max(vBary.x,max(vBary.y,vBary.z)));
-  col=mix(col,vec3(1.0),vdot);
-  gl_FragColor=vec4(col,edge+vdot*0.5);}`,
+  vec3 b=vBary;
+  vec3 d=fwidth(b);
+  vec3 a=smoothstep(vec3(0.0),d*1.2,b);
+  float edge=1.0-min(min(a.x,a.y),a.z);
+  if(edge<0.05) discard;
+  float pulse=sin(vPos.y*6.-time*3.)*.15+.85;
+  gl_FragColor=vec4(vec3(1.0)*pulse,edge);}`,
   transparent: true,
   depthWrite: false,
   side: THREE.DoubleSide,
@@ -236,14 +262,11 @@ export const asciiMat = new THREE.ShaderMaterial({
     `uniform float time;uniform vec2 uResolution;varying vec3 vNormal,vPos;varying vec2 vUv;
 void main(){
   float l=dot(normalize(vNormal),normalize(vec3(1,1,1)))*.5+.5;
-
   float cellSize=12.0;
   vec2 cell=floor(gl_FragCoord.xy/cellSize);
   vec2 cellUv=fract(gl_FragCoord.xy/cellSize);
-
   float n=hash3(vec3(cell,floor(time*8.)));
   float brightness=l+n*0.05;
-
   int lvl=int(floor(brightness*6.));
   float cx=cellUv.x-.5, cy=cellUv.y-.5;
   float dot1=1.-smoothstep(.06,.1,length(vec2(cx,cy)));
@@ -279,17 +302,14 @@ export const chromaticMat = new THREE.ShaderMaterial({
     `uniform float time;uniform float uMouseDist;varying vec3 vNormal,vPos;varying vec2 vUv;
 void main(){
   float l=dot(normalize(vNormal),normalize(vec3(1,1,1)))*.5+.5;
-
   float strength=uMouseDist*0.04+0.002;
   vec3 n=normalize(vNormal);
-
   vec3 nr=normalize(n+vec3(strength,0.,0.));
   vec3 ng=n;
   vec3 nb=normalize(n+vec3(-strength,0.,0.));
   float lr=dot(nr,normalize(vec3(1,1,1)))*.5+.5;
   float lg=dot(ng,normalize(vec3(1,1,1)))*.5+.5;
   float lb=dot(nb,normalize(vec3(1,1,1)))*.5+.5;
-
   float fresnel=pow(1.-abs(dot(n,vec3(0,0,1))),2.);
   float nflicker=noise3(vPos*8.+time*0.5)*0.15;
   gl_FragColor=vec4(lr+fresnel*strength*8.,lg,lb+fresnel*strength*6.,1.);}`,
@@ -302,16 +322,110 @@ export const celMat = new THREE.ShaderMaterial({
 void main(){
   vec3 n=normalize(vNormal);
   float l=dot(n,normalize(vec3(1,1,1)));
-
   float cel=floor(l*4.0)/4.0;
   cel=clamp(cel,0.0,1.0);
-
   float rim=abs(dot(n,vec3(0,0,1)));
   float outline=step(rim,0.25);
-
   vec3 base=mix(vec3(0.15,0.15,0.2),vec3(0.9,0.9,1.0),cel);
   base=mix(base,vec3(0.2,0.7,1.0),uHoverStrength*cel);
   gl_FragColor=vec4(mix(base,vec3(0.0),outline),1.);}`,
+});
+
+export const hologramMat = new THREE.ShaderMaterial({
+  uniforms: { time: { value: 0 }, ...hoverU },
+  vertexShader:
+    NOISE3 +
+    `uniform float time;varying vec3 vNormal,vPos;varying float vFresnel;
+void main(){
+  vNormal=normal;
+  vPos=position;
+  vec3 camDir=normalize(cameraPosition-( modelMatrix*vec4(position,1.)).xyz);
+  vFresnel=pow(1.-abs(dot(normalize(normalMatrix*normal),camDir)),2.);
+  vec3 p=position;
+  float jitter=noise3(vec3(p.y*10.+time*8.,time*3.,0.))*0.008;
+  p.x+=step(0.98,fract(time*0.7+p.y*3.))*jitter*8.;
+  gl_Position=projectionMatrix*modelViewMatrix*vec4(p,1.);}`,
+  fragmentShader: `uniform float time;varying vec3 vNormal,vPos;varying float vFresnel;
+void main(){
+  float scanline=step(0.5,fract(vPos.y*8.-time*2.));
+  float scanThin=step(0.92,fract(vPos.y*40.+time*4.));
+  float l=dot(normalize(vNormal),normalize(vec3(1,1,1)))*.5+.5;
+  vec3 col=vec3(0.1,0.9,0.7)*l;
+  col+=vec3(0.0,0.3,0.2)*scanline*0.4;
+  col+=vec3(0.5,1.0,0.9)*scanThin;
+  col+=vec3(0.2,1.0,0.8)*vFresnel*1.2;
+  float flicker=step(0.995,fract(time*0.3+vPos.y*0.1))*0.5;
+  col=mix(col,vec3(0.,1.,0.7),flicker);
+  float alpha=max(0.25+vFresnel*0.5,scanline*0.15+scanThin);
+  gl_FragColor=vec4(col,alpha);}`,
+  transparent: true,
+  side: THREE.DoubleSide,
+  depthWrite: false,
+});
+
+export const morphMat = new THREE.ShaderMaterial({
+  uniforms: { time: { value: 0 }, ...hoverU },
+  vertexShader:
+    NOISE3 +
+    `uniform float time;varying vec3 vNormal,vPos;
+float sdSphere(vec3 p,float r){return length(p)-r;}
+float sdBox(vec3 p,vec3 b){vec3 q=abs(p)-b;return length(max(q,0.))+min(max(q.x,max(q.y,q.z)),0.);}
+void main(){
+  vNormal=normal;
+  float t=sin(time*0.4)*0.5+0.5;
+  float s=sdSphere(position,1.0);
+  float b=sdBox(position,vec3(0.85));
+  float d=mix(s,b,t);
+  float n=noise3(position*3.+time*0.5)*0.12;
+  vec3 p=position-normalize(position)*d*(1.0+n);
+  vPos=p;
+  gl_Position=projectionMatrix*modelViewMatrix*vec4(p,1.);}`,
+  fragmentShader:
+    NOISE3 +
+    `uniform float time;varying vec3 vNormal,vPos;
+void main(){
+  float l=dot(normalize(vNormal),normalize(vec3(1,1,1)))*.5+.5;
+  float t=sin(time*0.4)*0.5+0.5;
+  vec3 a=vec3(0.3,0.6,1.0);
+  vec3 b=vec3(1.0,0.4,0.2);
+  float n=noise3(vPos*4.+time*0.3)*0.3;
+  vec3 col=mix(a,b,t+n)*l;
+  gl_FragColor=vec4(col,1.);}`,
+});
+
+export const mixMat = new THREE.ShaderMaterial({
+  uniforms: {
+    time: { value: 0 },
+    uMixA: { value: 0 },
+    uMixB: { value: 1 },
+    uBlend: { value: 0.5 },
+    ...hoverU,
+  },
+  vertexShader:
+    NOISE3 +
+    `uniform float time;uniform float uBlend;varying vec3 vNormal,vPos;varying float vFresnel;
+void main(){
+  vNormal=normal;
+  vPos=position;
+  vec3 camDir=normalize(cameraPosition-(modelMatrix*vec4(position,1.)).xyz);
+  vFresnel=pow(1.-abs(dot(normalize(normalMatrix*normal),camDir)),2.);
+  vec3 p=position;
+  float vox=sin(time*0.4)*0.5+0.5;
+  p=mix(p,floor(p*6.+.5)/6.,vox*uBlend);
+  float n=noise3(p*3.+time*0.5)*0.06*(1.-uBlend);
+  p+=normal*n;
+  gl_Position=projectionMatrix*modelViewMatrix*vec4(p,1.);}`,
+  fragmentShader: `uniform float time;uniform float uBlend;varying vec3 vNormal,vPos;varying float vFresnel;
+void main(){
+  float l=dot(normalize(vNormal),normalize(vec3(1,1,1)))*.5+.5;
+  float scanline=step(0.5,fract(vPos.y*8.-time*2.));
+  vec3 holoCol=vec3(0.1,0.9,0.7)*l+vec3(0.2,1.0,0.8)*vFresnel;
+  vec3 voxCol=vec3(l);
+  vec3 col=mix(voxCol,holoCol,uBlend);
+  float alpha=mix(1.0,max(0.3+vFresnel*0.5,scanline*0.2),uBlend);
+  gl_FragColor=vec4(col,alpha);}`,
+  transparent: true,
+  depthWrite: false,
 });
 
 export const materials = [
@@ -333,7 +447,11 @@ export const materials = [
   asciiMat,
   chromaticMat,
   celMat,
+  hologramMat,
+  morphMat,
+  mixMat,
 ];
+
 export const matNames = [
   "voxel",
   "vhs",
@@ -353,6 +471,9 @@ export const matNames = [
   "ascii",
   "chromatic",
   "cel",
+  "hologram",
+  "morph",
+  "mix",
 ];
 
 export const hoverLinkedMats = [
@@ -366,6 +487,7 @@ export const hoverLinkedMats = [
   fireMat,
   celMat,
   chromaticMat,
+  glassMat,
 ];
 export const timeMats = [
   vhsMat,
@@ -382,6 +504,9 @@ export const timeMats = [
   chromaticMat,
   celMat,
   bgMat,
+  hologramMat,
+  morphMat,
+  mixMat,
 ];
 
 let matIdx = Math.floor(Math.random() * materials.length);
@@ -436,14 +561,11 @@ export function makeNodeHoverMat(time) {
       fragmentShader: `uniform float time;uniform vec3 baseColor;varying vec3 vNormal;void main(){float rim=pow(1.-abs(dot(normalize(vNormal),vec3(0,0,1))),2.);float pulse=sin(time*6.)*.5+.5;gl_FragColor=vec4(baseColor*(rim*2.+pulse*0.5),rim+0.1);}`,
       transparent: true,
     }),
-
     new THREE.ShaderMaterial({
       uniforms: { time: { value: time } },
       vertexShader: `varying vec3 vPos;void main(){vPos=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
       fragmentShader: `uniform float time;varying vec3 vPos;void main(){float h=fract(atan(vPos.x,vPos.z)/(3.14159*2.)+time*.3);vec3 col=0.5+0.5*cos(6.28*(h+vec3(0,.33,.67)));gl_FragColor=vec4(col,1.);}`,
-      transparent: false,
     }),
-
     new THREE.ShaderMaterial({
       uniforms: { time: { value: time } },
       vertexShader: `varying vec3 vPos;void main(){vPos=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,

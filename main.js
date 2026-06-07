@@ -42,10 +42,13 @@ import {
   hubFriends,
   hubServices,
   returnNode,
+  secretNode,
   activateMe,
   activateFriends,
   activateServices,
+  activateSecretMenu,
   tickOpacity,
+  showSecretPopup,
 } from "./src/nav.js";
 import {
   drawPost,
@@ -56,7 +59,13 @@ import {
   hideTooltip,
   labelPos,
 } from "./src/ui.js";
-import { isIyrsOpen, openIyrs } from "./src/iyrs.js";
+import {
+  isIyrsOpen,
+  openIyrs,
+  anotherChance,
+  startHoverGlitch,
+  cancelHoverGlitch,
+} from "./src/iyrs.js";
 import { initMobile } from "./src/mobile.js";
 import { initPaintTex, getPaintTexture, paintAt } from "./src/paint.js";
 
@@ -70,7 +79,18 @@ const artifactGroup = new THREE.Group();
 scene.add(artifactGroup);
 
 initNav(artifactGroup);
-loadStartupModel();
+
+const randomdonut = Math.random() < 0.08;
+if (randomdonut) {
+  spawnFallback(() => new THREE.TorusGeometry(1.0, 0.38, 64, 128));
+} else {
+  loadStartupModel();
+}
+
+if (anotherChance) {
+  const nameSpan = document.getElementById("name-span");
+  if (nameSpan) nameSpan.textContent = anotherChance;
+}
 
 let mouseX = 0,
   mouseY = 0,
@@ -82,9 +102,10 @@ let camZoom = 10,
   camTY = 0;
 let hoverTarget = 0;
 const BASE_FOV = 45;
-
 let prevRotY = 0,
   prevRotX = 0;
+
+let modelHoverStart = null;
 
 function updateSub() {
   const sub = document.getElementById("shader-sub");
@@ -93,30 +114,21 @@ function updateSub() {
     .querySelectorAll(".ctx-active-item")
     .forEach((el) => el.classList.remove("ctx-active-item"));
   if (!getCustomMat()) {
-    const ids = [
-      "ctx-sh-voxel",
-      "ctx-sh-vhs",
-      "ctx-sh-glass",
-      "ctx-sh-noise",
-      "ctx-sh-sketch",
-      "ctx-sh-pixelate",
-      "ctx-sh-lightup",
-      "ctx-sh-liquid",
-      "ctx-sh-distort",
-      "ctx-sh-wireframe",
-      "ctx-sh-watercolor",
-      "ctx-sh-motionblur",
-      "ctx-sh-metallic",
-      "ctx-sh-paint",
-    ];
-    const el = document.getElementById(ids[getMatIdx()]);
-    if (el) el.classList.add("ctx-active-item");
+    const gridCells = document.querySelectorAll(".shader-grid-cell");
+    gridCells.forEach((el) => el.classList.remove("ctx-active-item"));
+    const active = document.querySelector(
+      `.shader-grid-cell[data-idx="${getMatIdx()}"]`,
+    );
+    if (active) active.classList.add("ctx-active-item");
   }
 }
 
 function doApplyMat() {
   applyMatToModel();
   updateSub();
+
+  const isGodRay = getMatIdx() === -1;
+  bgMat.uniforms.uGodRays.value = 0.0;
 }
 
 document.getElementById("name-span").addEventListener("click", (e) => {
@@ -129,40 +141,41 @@ document.getElementById("shader-sub").addEventListener("click", (e) => {
 });
 
 const ctxMenu = document.getElementById("shader-ctx-menu");
+
+function buildShaderGrid() {
+  const grid = document.getElementById("shader-grid");
+  if (!grid) return;
+  grid.innerHTML = "";
+  matNames.forEach((name, idx) => {
+    const cell = document.createElement("div");
+    cell.className = "shader-grid-cell";
+    cell.setAttribute("data-idx", idx);
+
+    const label = document.createElement("span");
+    label.className = "shader-grid-label";
+    label.textContent = name;
+    cell.appendChild(label);
+
+    cell.addEventListener("click", () => {
+      ctxMenu.style.display = "none";
+      setMatByIdx(idx, doApplyMat);
+    });
+
+    grid.appendChild(cell);
+  });
+}
+
 document.getElementById("name-span").addEventListener("contextmenu", (e) => {
   e.preventDefault();
   e.stopPropagation();
+  buildShaderGrid();
   ctxMenu.style.cssText = `display:block;left:${e.clientX}px;top:${e.clientY}px`;
+  updateSub();
 });
 document.addEventListener("click", () => (ctxMenu.style.display = "none"));
 document.addEventListener("contextmenu", (e) => {
   if (!e.target.closest("#shader-ctx-menu") && e.target.id !== "name-span")
     ctxMenu.style.display = "none";
-});
-
-const shaderPicks = [
-  ["ctx-sh-voxel", 0],
-  ["ctx-sh-vhs", 1],
-  ["ctx-sh-glass", 2],
-  ["ctx-sh-noise", 3],
-  ["ctx-sh-sketch", 4],
-  ["ctx-sh-pixelate", 5],
-  ["ctx-sh-lightup", 6],
-  ["ctx-sh-liquid", 7],
-  ["ctx-sh-distort", 8],
-  ["ctx-sh-wireframe", 9],
-  ["ctx-sh-watercolor", 10],
-  ["ctx-sh-motionblur", 11],
-  ["ctx-sh-metallic", 12],
-  ["ctx-sh-paint", 13],
-];
-shaderPicks.forEach(([id, idx]) => {
-  const el = document.getElementById(id);
-  if (!el) return;
-  el.addEventListener("click", () => {
-    ctxMenu.style.display = "none";
-    setMatByIdx(idx, doApplyMat);
-  });
 });
 
 document.getElementById("ctx-mesh-tknot").addEventListener("click", () => {
@@ -211,6 +224,12 @@ document.getElementById("shader-upload").addEventListener("change", (e) => {
   r.readAsText(f);
 });
 
+document.getElementById("ctx-god-rays")?.addEventListener("click", () => {
+  ctxMenu.style.display = "none";
+  const cur = bgMat.uniforms.uGodRays.value;
+  bgMat.uniforms.uGodRays.value = cur > 0 ? 0 : 1.0;
+});
+
 const holdExcluded = new Set([
   document.getElementById("name-span"),
   document.getElementById("shader-sub"),
@@ -247,7 +266,6 @@ document.addEventListener("mousemove", (e) => {
     camTX = mousePosNX * 0.5;
     camTY = mousePosNY * 0.5;
   }
-
   if (getMatIdx() === 13 && !getCustomMat()) {
     raycaster.setFromCamera(mouse, camera);
     const hits = raycaster.intersectObjects(getModelGroup().children, true);
@@ -284,6 +302,16 @@ document.addEventListener("click", () => {
       activateMe();
       return;
     }
+    if (secretNode && obj === secretNode.mesh) {
+      const mg = getModelGroup();
+      while (mg.children.length) mg.remove(mg.children[0]);
+      activateSecretMenu(artifactGroup);
+      return;
+    }
+    if (obj.userData.isSecretEntry) {
+      showSecretPopup(obj.userData.popup);
+      return;
+    }
     const u = obj.userData.url;
     if (u) window.open(u, "_blank");
   } else if (mi.length) {
@@ -314,11 +342,21 @@ initMobile({
         activateMe();
         return;
       }
+      if (secretNode && obj === secretNode.mesh) {
+        const mg = getModelGroup();
+        while (mg.children.length) mg.remove(mg.children[0]);
+        activateSecretMenu(artifactGroup);
+        return;
+      }
+      if (obj.userData.isSecretEntry) {
+        showSecretPopup(obj.userData.popup);
+        return;
+      }
       const u = obj.userData.url;
       if (u) window.open(u, "_blank");
     }
   },
-  onHoldStart: ({ clientX, clientY }) => {
+  onHoldStart: () => {
     if (!isIyrsOpen()) openIyrs();
   },
   onHoldEnd: cancelHold,
@@ -380,6 +418,15 @@ function animate() {
     0.05 * (mouseY * 0.001 - artifactGroup.rotation.x);
   artifactGroup.rotation.z += 0.001;
 
+  if (secretNode?.mesh) {
+    secretNode.mesh.rotation.y += 0.02;
+    secretNode.mesh.rotation.x += 0.01;
+    const pulse = Math.sin(t * 3) * 0.5 + 0.5;
+    if (secretNode.mat?.uniforms?.uOpacity) {
+      secretNode.mat.uniforms.uOpacity.value = 0.5 + pulse * 0.4;
+    }
+  }
+
   raycaster.setFromCamera(mouse, camera);
   const li = raycaster.intersectObjects(clickables);
   const mi = raycaster.intersectObjects(getModelGroup().children, true);
@@ -390,8 +437,12 @@ function animate() {
       document.body.style.cursor = "pointer";
       hovNode = li[0].object;
       const ud = hovNode.userData;
-      showTooltip(ud.isHub || ud.isReturn ? ud.label : `url: ${ud.url}`);
+      if (ud.isSecretNode) showTooltip("?");
+      else if (ud.isSecretEntry) showTooltip(ud.label);
+      else showTooltip(ud.isHub || ud.isReturn ? ud.label : `url: ${ud.url}`);
       hoverTarget = 0;
+      if (hovNode === secretNode?.mesh) {
+      }
     } else if (mi.length) {
       document.body.style.cursor = "pointer";
       showTooltip("upload custom model (.gltf/.glb)");
@@ -399,12 +450,27 @@ function animate() {
       hoverU.uHoverPos.value.copy(
         getModelGroup().worldToLocal(mi[0].point.clone()),
       );
+
+      if (modelHoverStart === null) {
+        modelHoverStart = Date.now();
+        startHoverGlitch();
+      }
     } else {
       document.body.style.cursor = "default";
       hideTooltip();
       hoverTarget = 0;
+      if (modelHoverStart !== null) {
+        modelHoverStart = null;
+        cancelHoverGlitch();
+      }
+    }
+  } else {
+    if (modelHoverStart !== null) {
+      modelHoverStart = null;
+      cancelHoverGlitch();
     }
   }
+
   hoverU.uHoverStrength.value +=
     (hoverTarget - hoverU.uHoverStrength.value) * 0.06;
   labelEls.forEach((item) =>

@@ -117,7 +117,6 @@ body {
     z-index: 2;
     pointer-events: none;
 }
-
 #mobile-hint {
     display: none;
     position: absolute;
@@ -136,21 +135,25 @@ body {
 
 #shader-ctx-menu {
     position: fixed;
-    background: rgba(10, 10, 10, 0.95);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(8, 8, 8, 0.97);
+    border: 1px solid rgba(255, 255, 255, 0.15);
     padding: 4px 0;
     font-size: 12px;
     font-family: monospace;
     color: #ccc;
     z-index: 100;
     display: none;
-    min-width: 180px;
+    min-width: 240px;
+    max-height: 80vh;
+    overflow-y: auto;
 }
-#shader-ctx-menu div {
+#shader-ctx-menu
+    > div:not(#shader-grid):not(.ctx-section-label):not(.ctx-divider) {
     padding: 7px 14px;
     cursor: pointer;
 }
-#shader-ctx-menu div:hover {
+#shader-ctx-menu
+    > div:not(#shader-grid):not(.ctx-section-label):not(.ctx-divider):hover {
     background: rgba(255, 255, 255, 0.1);
     color: #fff;
 }
@@ -173,6 +176,51 @@ body {
     height: 1px;
     background: rgba(255, 255, 255, 0.08);
     margin: 4px 0;
+}
+
+#shader-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 3px;
+    padding: 6px 8px;
+}
+.shader-grid-cell {
+    aspect-ratio: 1;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    cursor: pointer;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding: 4px 2px;
+    position: relative;
+    transition:
+        background 0.1s,
+        border-color 0.1s;
+    min-height: 44px;
+}
+.shader-grid-cell:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.3);
+}
+.shader-grid-cell.ctx-active-item {
+    border-color: #4af;
+    background: rgba(68, 170, 255, 0.1);
+}
+.shader-grid-label {
+    font-size: 8px;
+    color: #888;
+    letter-spacing: 0.5px;
+    text-align: center;
+    line-height: 1.2;
+    pointer-events: none;
+    transition: color 0.1s;
+}
+.shader-grid-cell:hover .shader-grid-label {
+    color: #fff;
+}
+.shader-grid-cell.ctx-active-item .shader-grid-label {
+    color: #4af;
 }
 
 #hold-ring {
@@ -374,7 +422,6 @@ body {
     overflow: hidden;
     min-height: 0;
 }
-
 #iy-sidebar {
     width: 200px;
     flex-shrink: 0;
@@ -705,18 +752,15 @@ body {
     .track-label {
         font-size: 10px;
     }
-
     #link-tooltip {
         bottom: 12px;
         font-size: 12px;
         max-width: 80vw;
         text-align: center;
     }
-
     #iy-sidebar {
         display: none;
     }
-
     #iy-nav a {
         padding: 0 10px;
         font-size: 11px;
@@ -724,28 +768,24 @@ body {
     #iy-greeting-text {
         font-size: 16px;
     }
-
     .msg {
         max-width: 90%;
         font-size: 12px;
     }
-
     #iy-input {
         font-size: 16px;
     }
     #iy-input-zone {
         padding: 10px 12px;
     }
-
     #shader-ctx-menu {
         font-size: 14px;
         min-width: 200px;
     }
-    #shader-ctx-menu div {
-        padding: 10px 16px;
+    #shader-grid {
+        grid-template-columns: repeat(3, 1fr);
     }
 }
-
 @media (max-width: 400px) {
     #name-span {
         font-size: 15px;
