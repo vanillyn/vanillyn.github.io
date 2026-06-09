@@ -26,7 +26,7 @@ export function drawPost(nx, ny) {
   postCtx.fillStyle = eg;
   postCtx.fillRect(0, 0, w, h);
 }
-
+/*
 const vhsCv = document.getElementById("vhs-canvas");
 const vhsCtx = vhsCv.getContext("2d");
 export function resizeVhs() {
@@ -95,7 +95,7 @@ export function drawVhs() {
   }
   grainCtx.putImageData(id, 0, 0);
   vhsCtx.drawImage(grainCv, 0, 0, w, h);
-}
+} */
 
 const HOLD_MS = 3000;
 let holdTimer = null,

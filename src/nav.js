@@ -1,4 +1,5 @@
 import { makeLineMat } from "./materials.js";
+import { launchScene } from "./scene.js";
 
 const LINKS_ME = [
   { label: "neo-polita", url: "https://discord.gg/2KVRMDHCnN" },
@@ -51,6 +52,10 @@ const DATA_ENTRIES = [
     },
   },
   {
+    label: "scene test",
+    popup: { type: "script", sceneId: "cube" },
+  },
+  {
     label: "submenu test",
     submenu: [
       {
@@ -95,10 +100,7 @@ let dataMenuMeshes = [];
 let dataMenuEls = [];
 let dataMenuMats = [];
 
-let subMenuMeshes = [];
-let subMenuEls = [];
-let subMenuMats = [];
-let activeSubEntries = [];
+let subMenuStack = [];
 let isInSubMenu = false;
 
 const opacityTweens = new Map();
@@ -206,6 +208,11 @@ const popupEl = (() => {
 })();
 
 export function showdataPopup(popup) {
+  if (popup?.type === "script") {
+    launchScene(popup.sceneId);
+    return;
+  }
+
   popupEl.body.innerHTML = "";
 
   if (!popup || typeof popup === "string") {
@@ -314,7 +321,7 @@ export function showdataPopup(popup) {
   popupEl.el.style.display = "block";
 }
 
-function builddataMenu(group) {
+function buildDataMenu(group) {
   if (dataMenuMeshes.length) return;
   DATA_ENTRIES.forEach((entry, i) => {
     const mat = makeLineMat(DATA_NODE_COLOR, 0);
@@ -356,14 +363,14 @@ function builddataMenu(group) {
   });
 }
 
-function buildSubMenu(entries, group) {
-  clearSubMenu(group);
-  isInSubMenu = true;
-  activeSubEntries = entries;
+function pushSubMenu(entries, group) {
+  const meshes = [],
+    els = [],
+    mats = [];
   entries.forEach((entry, i) => {
     const mat = makeLineMat(DATA_NODE_COLOR, 0);
     allLayerMats.push(mat);
-    subMenuMats.push(mat);
+    mats.push(mat);
     const angle = (i / entries.length) * Math.PI * 2;
     const r = 2.0;
     const pos = new THREE.Vector3(
@@ -373,38 +380,71 @@ function buildSubMenu(entries, group) {
     );
     const node = new THREE.Mesh(new THREE.IcosahedronGeometry(0.11, 1), mat);
     node.position.copy(pos);
-    node.userData = {
-      isDataEntry: true,
-      label: entry.label,
-      popup: entry.popup,
-    };
+
+    if (entry.submenu) {
+      node.userData = {
+        isDataEntry: true,
+        isSubMenuHub: true,
+        label: entry.label,
+        subEntries: entry.submenu,
+      };
+    } else {
+      node.userData = {
+        isDataEntry: true,
+        label: entry.label,
+        popup: entry.popup,
+      };
+    }
+
     group.add(node);
-    subMenuMeshes.push(node);
+    meshes.push(node);
     const div = document.createElement("div");
     div.className = "track-label";
     div.innerText = entry.label;
     div.style.color = DATA_NODE_COLOR;
     div.style.fontSize = "9px";
     labelsContainer.appendChild(div);
-    subMenuEls.push({ mesh: node, el: div });
+    els.push({ mesh: node, el: div });
   });
-  subMenuMats.forEach((m) => fadeMat(m, 1, 0.06));
+  mats.forEach((m) => fadeMat(m, 1, 0.06));
+  subMenuStack.push({ meshes, els, mats, entries });
+  isInSubMenu = true;
 }
 
-function clearSubMenu(group) {
-  subMenuMeshes.forEach((m) => group && group.remove(m));
-  subMenuEls.forEach(({ el }) => el.remove());
-  subMenuMeshes = [];
-  subMenuEls = [];
-  subMenuMats = [];
-  isInSubMenu = false;
-  activeSubEntries = [];
+function popSubMenuLevel(group) {
+  const top = subMenuStack.pop();
+  if (!top) return;
+  top.meshes.forEach((m) => group && group.remove(m));
+  top.els.forEach(({ el }) => el.remove());
+  top.mats.forEach((m) => {
+    opacityTweens.delete(m);
+    m.uniforms.uOpacity.value = 0;
+    m.visible = false;
+  });
+  isInSubMenu = subMenuStack.length > 0;
+}
+
+function clearAllSubMenus(group) {
+  while (subMenuStack.length) popSubMenuLevel(group);
+}
+
+function currentSubLevel() {
+  return subMenuStack.length ? subMenuStack[subMenuStack.length - 1] : null;
 }
 
 export function openSubMenu(entries) {
-  buildSubMenu(entries, _artifactGroup);
+  const prev = currentSubLevel();
+  if (prev) {
+    prev.mats.forEach((m) => fadeMat(m, 0, 0.05));
+    prev.els.forEach(({ el }) => {
+      el.style.opacity = "0";
+      el.style.pointerEvents = "none";
+    });
+  } else {
+    dataMenuMats.forEach((m) => fadeMat(m, 0, 0.05));
+  }
 
-  dataMenuMats.forEach((m) => fadeMat(m, 0, 0.05));
+  pushSubMenu(entries, _artifactGroup);
 
   if (returnNode) {
     returnNode.mesh.userData = {
@@ -418,7 +458,22 @@ export function openSubMenu(entries) {
 }
 
 export function closeSubMenu() {
-  clearSubMenu(_artifactGroup);
+  if (subMenuStack.length > 1) {
+    popSubMenuLevel(_artifactGroup);
+    const prev = currentSubLevel();
+    if (prev) {
+      prev.mats.forEach((m) => fadeMat(m, 1, 0.05));
+      prev.els.forEach(({ el }) => {
+        el.style.opacity = "";
+        el.style.pointerEvents = "";
+      });
+    }
+
+    updateClickables();
+    return;
+  }
+
+  clearAllSubMenus(_artifactGroup);
   dataMenuMats.forEach((m) => fadeMat(m, 1, 0.05));
 
   if (returnNode) {
@@ -508,7 +563,7 @@ function ensureReturn(artifactGroup) {
 export function activateMe(restoreModel) {
   activeLayer = "me";
   popupEl.el.style.display = "none";
-  clearSubMenu(_artifactGroup);
+  clearAllSubMenus(_artifactGroup);
 
   fadeMat(layers.me.mat, 1, 0.05);
   fadeMat(hubFriends.mat, 0.7, 0.05);
@@ -540,7 +595,7 @@ export function activateFriends(artifactGroup) {
   if (dataNode) fadeMat(dataNode.mat, 0, 0.05);
   dataMenuMats.forEach((m) => fadeMat(m, 0, 0.05));
 
-  clearSubMenu(artifactGroup);
+  clearAllSubMenus(artifactGroup);
   ensureReturn(artifactGroup);
   returnNode.mesh.userData = {
     isReturn: true,
@@ -568,7 +623,7 @@ export function activateServices(artifactGroup) {
   if (dataNode) fadeMat(dataNode.mat, 0, 0.05);
   dataMenuMats.forEach((m) => fadeMat(m, 0, 0.05));
 
-  clearSubMenu(artifactGroup);
+  clearAllSubMenus(artifactGroup);
   ensureReturn(artifactGroup);
   returnNode.mesh.userData = {
     isReturn: true,
@@ -581,7 +636,7 @@ export function activateServices(artifactGroup) {
 }
 
 export function activatedataMenu(artifactGroup) {
-  builddataMenu(artifactGroup);
+  buildDataMenu(artifactGroup);
   activeLayer = "data";
   fadeMat(layers.me.mat, 0, 0.05);
   fadeMat(hubFriends.mat, 0, 0.05);
@@ -629,9 +684,10 @@ function updateClickables() {
     labelEls.push(...layers.services.labelEls);
     if (returnNode) labelEls.push({ mesh: returnNode.mesh, el: returnNode.el });
   } else if (activeLayer === "data") {
-    if (isInSubMenu) {
-      clickables.push(...subMenuMeshes);
-      labelEls.push(...subMenuEls);
+    const top = currentSubLevel();
+    if (top) {
+      clickables.push(...top.meshes);
+      labelEls.push(...top.els);
     } else {
       clickables.push(...dataMenuMeshes);
       labelEls.push(...dataMenuEls);
@@ -649,7 +705,7 @@ function updateClickables() {
     { el: hubServices?.el },
     ...(returnNode ? [{ el: returnNode.el }] : []),
     ...dataMenuEls,
-    ...subMenuEls,
+    ...subMenuStack.flatMap((l) => l.els),
     ...(dataNode ? [{ el: dataNode.el }] : []),
   ];
   allEls.forEach(({ el }) => {

@@ -6,6 +6,12 @@ import {
   clock,
   raycaster,
   mouse,
+  openIyrs,
+  closeIyrs,
+  isIyrsOpen,
+  anotherChance,
+  startHoverGlitch,
+  cancelHoverGlitch,
 } from "./src/scene.js";
 import {
   materials,
@@ -55,14 +61,13 @@ import {
 } from "./src/nav.js";
 import {
   drawPost,
-  drawVhs,
   startHold,
   cancelHold,
   showTooltip,
   hideTooltip,
   labelPos,
 } from "./src/ui.js";
-import { isIyrsOpen, openIyrs, anotherChance } from "./src/iyrs.js";
+
 import { initMobile } from "./src/mobile.js";
 import { initPaintTex, paintAt } from "./src/paint.js";
 import {
@@ -88,8 +93,8 @@ initNav(artifactGroup);
 const postReady = initPost(renderer, scene, camera);
 
 if (postReady) {
-  setPostChromatic(true, 0.6);
-  setPostMotionBlur(true, 0.0);
+  setPostChromatic(false, 0.0);
+  setPostMotionBlur(false, 0.0);
 }
 
 const randomdonut = Math.random() < 0.08;
@@ -192,6 +197,16 @@ function updateSub() {
 function doApplyMat() {
   applyMatToModel();
   updateSub();
+  syncPostEffects();
+}
+
+function syncPostEffects() {
+  if (!postReady) return;
+  const mat = curMat();
+  const isChromatic = !getCustomMat() && mat === chromaticMat;
+  const isMotionBlur = !getCustomMat() && mat === motionBlurMat;
+  setPostChromatic(isChromatic, isChromatic ? 1.8 : 0.0);
+  setPostMotionBlur(isMotionBlur, 0.0);
 }
 
 document.getElementById("name-span").addEventListener("click", (e) => {
@@ -469,8 +484,8 @@ initMobile({
   },
 });
 
-drawVhs();
 updateSub();
+syncPostEffects();
 
 function animate() {
   requestAnimationFrame(animate);
@@ -500,15 +515,17 @@ function animate() {
 
   if (motionBlurMat.uniforms?.uVelocity)
     motionBlurMat.uniforms.uVelocity.value.set(rotVelY * 10, rotVelX * 10, 0);
-  if (postReady) setBlurVelocity(totalVel);
 
   if (postReady) {
-    const isChromaticActive = !getCustomMat() && curMat() === chromaticMat;
-    if (isChromaticActive) {
+    const mat = curMat();
+    const isMotionBlurShader = !getCustomMat() && mat === motionBlurMat;
+    const isChromaticShader = !getCustomMat() && mat === chromaticMat;
+
+    if (isMotionBlurShader) {
+      setBlurVelocity(totalVel);
+    }
+    if (isChromaticShader) {
       setChromaticStrength(1.8 + Math.sin(t * 0.4) * 0.4);
-    } else {
-      const velChrom = 0.6 + Math.min(totalVel * 8, 1.2);
-      setChromaticStrength(velChrom);
     }
   }
 
@@ -571,9 +588,7 @@ function animate() {
       if (!isHoveringModel) {
         isHoveringModel = true;
         hoverTimer = setTimeout(() => {
-          if (isHoveringModel) {
-            flashAndReload();
-          }
+          if (isHoveringModel) flashAndReload();
         }, 10000);
       }
     } else {
