@@ -14,24 +14,63 @@ const LINKS_SERVICES = [
 const HUB_FRIENDS_COLOR = "#3af";
 const HUB_SERVICES_COLOR = "#3f9";
 const RETURN_COLOR = "#f44";
-const data_NODE_COLOR = "#ffdd00";
+const DATA_NODE_COLOR = "#ffdd00";
 
-const data_ENTRIES = [
-  { label: "placeholder", popup: "placeholder text :3" },
+const DATA_ENTRIES = [
+  {
+    label: "placeholder",
+    popup: { type: "text", content: "placeholder text :3" },
+  },
   {
     label: "about me",
-    popup:
-      'im vanillyn. i sorta just behave how people like me too. i prioritize being likable over anything else, which is ironic considering how many people dislike me. this includes not really having a gender or sexuality. i am whatever you see me as. id say im good with programming and troubleshooting. i really love computers and really love helping people with it. anything with computers, really. i wish i could say "i do this specific thing and asking me to do anything else wont work" but really i do everything. i dont have many friends, if at all. i wish to be able to talk to people more often in private, because i miss being able to be myself, but i guess people dont want myself. its fine either way. thanks for checking out my website btw. i dont do anything right now, but i promise there will be cool projects.',
+    popup: {
+      type: "mixed",
+      blocks: [
+        {
+          type: "image",
+          src: "https://static-cdn.jtvnw.net/jtv_user_pictures/07e4d1f2-5acc-4086-b0d6-9f1ddabe916f-profile_image-70x70.png",
+        },
+        {
+          type: "text",
+          content:
+            'im vanillyn. i sorta just behave how people like me too. i prioritize being likable over anything else, which is ironic considering how many people dislike me. this includes not really having a gender or sexuality. i am whatever you see me as. id say im good with programming and troubleshooting. i really love computers and really love helping people with it. anything with computers, really. i wish i could say "i do this specific thing and asking me to do anything else wont work" but really i do everything. i dont have many friends, if at all. i wish to be able to talk to people more often in private, because i miss being able to be myself, but i guess people dont want myself. its fine either way. thanks for checking out my website btw. i dont do anything right now, but i promise there will be cool projects.',
+        },
+      ],
+    },
   },
   {
     label: "current version",
-    popup: "website version 1.3",
+    popup: { type: "text", content: "website version 1.6" },
   },
-
   {
     label: "about the website",
-    popup:
-      "this website is sorta just a culmination of me having made websites for a while, i just dont want to have a 'normal' ui and just choose to do this. in small quotes this time because im using big quotes in the code.",
+    popup: {
+      type: "text",
+      content:
+        'this website is sorta just a culmination of me having made websites for a while, i just dont want to have a "normal" ui and just choose to do this.',
+    },
+  },
+  {
+    label: "submenu test",
+    submenu: [
+      {
+        label: "placeholder a",
+        popup: { type: "text", content: "a description placeholder." },
+      },
+      {
+        label: "placeholder b",
+        popup: { type: "text", content: "b description placeholder." },
+      },
+      {
+        label: "nested submenu",
+        submenu: [
+          {
+            label: "placeholder c",
+            popup: { type: "text", content: "the ultimate placeholder." },
+          },
+        ],
+      },
+    ],
   },
 ];
 
@@ -55,6 +94,12 @@ let _artifactGroup = null;
 let dataMenuMeshes = [];
 let dataMenuEls = [];
 let dataMenuMats = [];
+
+let subMenuMeshes = [];
+let subMenuEls = [];
+let subMenuMats = [];
+let activeSubEntries = [];
+let isInSubMenu = false;
 
 const opacityTweens = new Map();
 
@@ -138,36 +183,144 @@ const popupEl = (() => {
   el.style.cssText = `
     position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
     background:rgba(5,5,5,0.97);border:1px solid #ffdd00;
-    color:#ffdd00;font-family:'Share Tech Mono',monospace;font-size:13px;
-    padding:22px 30px;max-width:360px;text-align:center;
+    color:#ffdd00;font-family:'Geist Mono',monospace;font-size:13px;
+    padding:22px 30px;max-width:480px;width:90vw;text-align:center;
     letter-spacing:1px;line-height:1.7;z-index:500;
-    display:none;pointer-events:auto;
+    display:none;pointer-events:auto;max-height:80vh;overflow-y:auto;
   `;
+
   const closeBtn = document.createElement("div");
   closeBtn.textContent = "✕";
-  closeBtn.style.cssText = `position:absolute;top:8px;right:12px;cursor:pointer;opacity:0.5;font-size:16px;`;
+  closeBtn.style.cssText = `position:sticky;top:0;float:right;cursor:pointer;opacity:0.5;font-size:16px;padding:0 0 8px 12px;`;
   closeBtn.onclick = () => {
     el.style.display = "none";
   };
   el.appendChild(closeBtn);
-  const textNode = document.createElement("span");
-  el.appendChild(textNode);
+
+  const body = document.createElement("div");
+  body.id = "data-popup-body";
+  el.appendChild(body);
+
   document.body.appendChild(el);
-  return { el, textNode };
+  return { el, body };
 })();
 
-export function showdataPopup(text) {
-  popupEl.textNode.textContent = text;
+export function showdataPopup(popup) {
+  popupEl.body.innerHTML = "";
+
+  if (!popup || typeof popup === "string") {
+    const t = document.createElement("span");
+    t.textContent = popup || "";
+    popupEl.body.appendChild(t);
+    popupEl.el.style.display = "block";
+    return;
+  }
+
+  switch (popup.type) {
+    case "text": {
+      const t = document.createElement("p");
+      t.style.margin = "0";
+      t.textContent = popup.content;
+      popupEl.body.appendChild(t);
+      break;
+    }
+    case "image": {
+      const img = document.createElement("img");
+      img.src = popup.src;
+      img.style.cssText =
+        "max-width:100%;border:1px solid #ffdd0066;display:block;margin:0 auto 10px;";
+      popupEl.body.appendChild(img);
+      if (popup.caption) {
+        const cap = document.createElement("p");
+        cap.style.cssText = "font-size:10px;opacity:0.6;margin:4px 0 0;";
+        cap.textContent = popup.caption;
+        popupEl.body.appendChild(cap);
+      }
+      break;
+    }
+    case "video": {
+      const vid = document.createElement("video");
+      vid.src = popup.src;
+      vid.controls = true;
+      vid.style.cssText =
+        "max-width:100%;border:1px solid #ffdd0066;display:block;margin:0 auto 10px;";
+      popupEl.body.appendChild(vid);
+      if (popup.caption) {
+        const cap = document.createElement("p");
+        cap.style.cssText = "font-size:10px;opacity:0.6;margin:4px 0 0;";
+        cap.textContent = popup.caption;
+        popupEl.body.appendChild(cap);
+      }
+      break;
+    }
+    case "gallery": {
+      const wrap = document.createElement("div");
+      wrap.style.cssText =
+        "display:flex;flex-wrap:wrap;gap:8px;justify-content:center;";
+      (popup.items || []).forEach((item) => {
+        const fig = document.createElement("figure");
+        fig.style.cssText = "margin:0;flex:1 1 120px;max-width:200px;";
+        const img = document.createElement("img");
+        img.src = item.src;
+        img.style.cssText =
+          "width:100%;border:1px solid #ffdd0044;display:block;cursor:pointer;";
+        img.onclick = () =>
+          showdataPopup({
+            type: "image",
+            src: item.src,
+            caption: item.caption,
+          });
+        const cap = document.createElement("figcaption");
+        cap.style.cssText = "font-size:9px;opacity:0.55;margin-top:3px;";
+        cap.textContent = item.caption || "";
+        fig.appendChild(img);
+        fig.appendChild(cap);
+        wrap.appendChild(fig);
+      });
+      popupEl.body.appendChild(wrap);
+      break;
+    }
+    case "mixed": {
+      (popup.blocks || []).forEach((block) => {
+        if (block.type === "text") {
+          const t = document.createElement("p");
+          t.style.cssText = "margin:0 0 10px;";
+          t.textContent = block.content;
+          popupEl.body.appendChild(t);
+        } else if (block.type === "image") {
+          const img = document.createElement("img");
+          img.src = block.src;
+          img.style.cssText =
+            "max-width:100%;border:1px solid #ffdd0066;display:block;margin:0 auto 10px;";
+          popupEl.body.appendChild(img);
+        } else if (block.type === "video") {
+          const vid = document.createElement("video");
+          vid.src = block.src;
+          vid.controls = true;
+          vid.style.cssText =
+            "max-width:100%;display:block;margin:0 auto 10px;";
+          popupEl.body.appendChild(vid);
+        }
+      });
+      break;
+    }
+    default: {
+      const t = document.createElement("span");
+      t.textContent = JSON.stringify(popup);
+      popupEl.body.appendChild(t);
+    }
+  }
+
   popupEl.el.style.display = "block";
 }
 
 function builddataMenu(group) {
   if (dataMenuMeshes.length) return;
-  data_ENTRIES.forEach((entry, i) => {
-    const mat = makeLineMat(data_NODE_COLOR, 0);
+  DATA_ENTRIES.forEach((entry, i) => {
+    const mat = makeLineMat(DATA_NODE_COLOR, 0);
     allLayerMats.push(mat);
     dataMenuMats.push(mat);
-    const angle = (i / data_ENTRIES.length) * Math.PI * 2;
+    const angle = (i / DATA_ENTRIES.length) * Math.PI * 2;
     const r = 2.5;
     const pos = new THREE.Vector3(
       Math.cos(angle) * r,
@@ -176,20 +329,107 @@ function builddataMenu(group) {
     );
     const node = new THREE.Mesh(new THREE.IcosahedronGeometry(0.13, 1), mat);
     node.position.copy(pos);
-    node.userData = {
-      isdataEntry: true,
-      label: entry.label,
-      popup: entry.popup,
-    };
+
+    if (entry.submenu) {
+      node.userData = {
+        isDataEntry: true,
+        isSubMenuHub: true,
+        label: entry.label,
+        subEntries: entry.submenu,
+      };
+    } else {
+      node.userData = {
+        isDataEntry: true,
+        label: entry.label,
+        popup: entry.popup,
+      };
+    }
+
     group.add(node);
     dataMenuMeshes.push(node);
     const div = document.createElement("div");
     div.className = "track-label";
     div.innerText = entry.label;
-    div.style.color = "#ffdd00";
+    div.style.color = DATA_NODE_COLOR;
     labelsContainer.appendChild(div);
     dataMenuEls.push({ mesh: node, el: div });
   });
+}
+
+function buildSubMenu(entries, group) {
+  clearSubMenu(group);
+  isInSubMenu = true;
+  activeSubEntries = entries;
+  entries.forEach((entry, i) => {
+    const mat = makeLineMat(DATA_NODE_COLOR, 0);
+    allLayerMats.push(mat);
+    subMenuMats.push(mat);
+    const angle = (i / entries.length) * Math.PI * 2;
+    const r = 2.0;
+    const pos = new THREE.Vector3(
+      Math.cos(angle) * r,
+      Math.sin(angle) * r * 0.7,
+      0.8,
+    );
+    const node = new THREE.Mesh(new THREE.IcosahedronGeometry(0.11, 1), mat);
+    node.position.copy(pos);
+    node.userData = {
+      isDataEntry: true,
+      label: entry.label,
+      popup: entry.popup,
+    };
+    group.add(node);
+    subMenuMeshes.push(node);
+    const div = document.createElement("div");
+    div.className = "track-label";
+    div.innerText = entry.label;
+    div.style.color = DATA_NODE_COLOR;
+    div.style.fontSize = "9px";
+    labelsContainer.appendChild(div);
+    subMenuEls.push({ mesh: node, el: div });
+  });
+  subMenuMats.forEach((m) => fadeMat(m, 1, 0.06));
+}
+
+function clearSubMenu(group) {
+  subMenuMeshes.forEach((m) => group && group.remove(m));
+  subMenuEls.forEach(({ el }) => el.remove());
+  subMenuMeshes = [];
+  subMenuEls = [];
+  subMenuMats = [];
+  isInSubMenu = false;
+  activeSubEntries = [];
+}
+
+export function openSubMenu(entries) {
+  buildSubMenu(entries, _artifactGroup);
+
+  dataMenuMats.forEach((m) => fadeMat(m, 0, 0.05));
+
+  if (returnNode) {
+    returnNode.mesh.userData = {
+      isReturn: true,
+      isReturnToData: true,
+      label: "← back",
+    };
+    returnNode.el.innerText = "← back";
+  }
+  updateClickables();
+}
+
+export function closeSubMenu() {
+  clearSubMenu(_artifactGroup);
+  dataMenuMats.forEach((m) => fadeMat(m, 1, 0.05));
+
+  if (returnNode) {
+    returnNode.mesh.userData = {
+      isReturn: true,
+      isReturnToData: false,
+      label: "← return",
+    };
+    returnNode.el.innerText = "← return";
+  }
+  updateClickables();
 }
 
 export function initNav(artifactGroup) {
@@ -230,16 +470,16 @@ export function initNav(artifactGroup) {
     }
   }
 
-  const smat = makeLineMat(data_NODE_COLOR, 0.8);
+  const smat = makeLineMat(DATA_NODE_COLOR, 0.8);
   allLayerMats.push(smat);
   const snode = new THREE.Mesh(new THREE.OctahedronGeometry(0.12, 0), smat);
   snode.position.set(2.1, -1.9, 0.3);
-  snode.userData = { isdataNode: true, label: "data" };
+  snode.userData = { isDataNode: true, label: "data" };
   artifactGroup.add(snode);
   const sdiv = document.createElement("div");
   sdiv.className = "track-label";
   sdiv.innerText = "data";
-  sdiv.style.color = "#ffdd00";
+  sdiv.style.color = DATA_NODE_COLOR;
   labelsContainer.appendChild(sdiv);
   dataNode = { mesh: snode, el: sdiv, mat: smat };
 
@@ -257,18 +497,26 @@ function ensureReturn(artifactGroup) {
       new THREE.Vector3(0, 3.2, 0.2),
       artifactGroup,
     );
-    returnNode.mesh.userData = { isReturn: true, label: "← return" };
+    returnNode.mesh.userData = {
+      isReturn: true,
+      isReturnToData: false,
+      label: "← return",
+    };
   }
 }
 
 export function activateMe(restoreModel) {
   activeLayer = "me";
+  popupEl.el.style.display = "none";
+  clearSubMenu(_artifactGroup);
+
   fadeMat(layers.me.mat, 1, 0.05);
   fadeMat(hubFriends.mat, 0.7, 0.05);
   fadeMat(hubServices.mat, 0.7, 0.05);
   if (layers.friends) fadeMat(layers.friends.mat, 0, 0.05);
   if (layers.services) fadeMat(layers.services.mat, 0, 0.05);
   if (returnNode) fadeMat(returnNode.mat, 0, 0.05);
+  if (dataNode) fadeMat(dataNode.mat, 0.8, 0.05);
 
   dataMenuMats.forEach((m) => fadeMat(m, 0, 0.05));
 
@@ -289,8 +537,17 @@ export function activateFriends(artifactGroup) {
   fadeMat(hubServices.mat, 0, 0.05);
   fadeMat(layers.friends.mat, 1, 0.05);
   if (layers.services) fadeMat(layers.services.mat, 0, 0.05);
+  if (dataNode) fadeMat(dataNode.mat, 0, 0.05);
   dataMenuMats.forEach((m) => fadeMat(m, 0, 0.05));
+
+  clearSubMenu(artifactGroup);
   ensureReturn(artifactGroup);
+  returnNode.mesh.userData = {
+    isReturn: true,
+    isReturnToData: false,
+    label: "← return",
+  };
+  returnNode.el.innerText = "← return";
   fadeMat(returnNode.mat, 0.8, 0.05);
   updateClickables();
 }
@@ -308,8 +565,17 @@ export function activateServices(artifactGroup) {
   fadeMat(hubServices.mat, 0, 0.05);
   if (layers.friends) fadeMat(layers.friends.mat, 0, 0.05);
   fadeMat(layers.services.mat, 1, 0.05);
+  if (dataNode) fadeMat(dataNode.mat, 0, 0.05);
   dataMenuMats.forEach((m) => fadeMat(m, 0, 0.05));
+
+  clearSubMenu(artifactGroup);
   ensureReturn(artifactGroup);
+  returnNode.mesh.userData = {
+    isReturn: true,
+    isReturnToData: false,
+    label: "← return",
+  };
+  returnNode.el.innerText = "← return";
   fadeMat(returnNode.mat, 0.8, 0.05);
   updateClickables();
 }
@@ -322,11 +588,15 @@ export function activatedataMenu(artifactGroup) {
   fadeMat(hubServices.mat, 0, 0.05);
   if (layers.friends) fadeMat(layers.friends.mat, 0, 0.05);
   if (layers.services) fadeMat(layers.services.mat, 0, 0.05);
-  dataMenuMats.forEach((m) => fadeMat(m, 1, 0.05));
-
   if (dataNode) fadeMat(dataNode.mat, 0, 0.05);
+  dataMenuMats.forEach((m) => fadeMat(m, 1, 0.05));
   ensureReturn(artifactGroup);
-  returnNode.mesh.userData = { isReturn: true, label: "← return" };
+  returnNode.mesh.userData = {
+    isReturn: true,
+    isReturnToData: false,
+    label: "← return",
+  };
+  returnNode.el.innerText = "← return";
   fadeMat(returnNode.mat, 0.8, 0.05);
   updateClickables();
 }
@@ -359,9 +629,14 @@ function updateClickables() {
     labelEls.push(...layers.services.labelEls);
     if (returnNode) labelEls.push({ mesh: returnNode.mesh, el: returnNode.el });
   } else if (activeLayer === "data") {
-    clickables.push(...dataMenuMeshes);
+    if (isInSubMenu) {
+      clickables.push(...subMenuMeshes);
+      labelEls.push(...subMenuEls);
+    } else {
+      clickables.push(...dataMenuMeshes);
+      labelEls.push(...dataMenuEls);
+    }
     if (returnNode) clickables.push(returnNode.mesh);
-    labelEls.push(...dataMenuEls);
     if (returnNode) labelEls.push({ mesh: returnNode.mesh, el: returnNode.el });
   }
 
@@ -374,6 +649,7 @@ function updateClickables() {
     { el: hubServices?.el },
     ...(returnNode ? [{ el: returnNode.el }] : []),
     ...dataMenuEls,
+    ...subMenuEls,
     ...(dataNode ? [{ el: dataNode.el }] : []),
   ];
   allEls.forEach(({ el }) => {

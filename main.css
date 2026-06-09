@@ -634,6 +634,7 @@ body {
     background: #1a3a6e;
     border-radius: 2px;
 }
+
 .msg {
     max-width: 70%;
     padding: 9px 13px;
@@ -650,6 +651,20 @@ body {
     color: #c8deff;
     border-bottom-right-radius: 2px;
 }
+
+.msg.room {
+    align-self: flex-start;
+    background: #070a11;
+    border: 1px solid #0e2a4e;
+    color: #7aaad4;
+    border-bottom-left-radius: 2px;
+    background-image: radial-gradient(
+        ellipse at center,
+        rgba(74, 170, 255, 0.04) 0%,
+        rgba(7, 10, 17, 0) 70%
+    );
+}
+
 .msg.ai {
     align-self: flex-start;
     background: #070a11;
@@ -662,15 +677,13 @@ body {
         rgba(7, 10, 17, 0) 70%
     );
 }
-.msg.ai::before {
-    content: "iyrs:";
-    position: absolute;
-    top: -17px;
-    left: 0;
-    font-size: 8px;
-    color: #1a4a8e;
-    letter-spacing: 2px;
+.msg-user {
+    color: #4af;
+    font-size: 10px;
     font-family: "Geist Mono", monospace;
+    display: block;
+    margin-bottom: 2px;
+    letter-spacing: 1px;
 }
 
 #iy-input-zone {
@@ -681,6 +694,25 @@ body {
     align-items: center;
     background: #ccccff;
     flex-shrink: 0;
+}
+#iy-attach {
+    background: #ddddff;
+    border: 1px solid #1a4a8e;
+    color: #4af;
+    font-size: 15px;
+    width: 36px;
+    height: 36px;
+    cursor: pointer;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: background 0.15s;
+    padding: 0;
+}
+#iy-attach:hover {
+    background: #1a3a6e;
 }
 #iy-input {
     flex: 1;

@@ -23,28 +23,144 @@ export function isIyrsOpen() {
   return iyrsOpen;
 }
 
+const FAKE_USERS = [
+  { name: "hazellyn", color: "#7af" },
+  { name: "vanillyn", color: "#f9a" },
+  { name: "moth", color: "#af7" },
+  { name: "iyrsbot", color: "#fa4", isBot: true },
+];
+
+const FAKE_MESSAGES = [
+  { user: "vanillyn", delay: 4000, text: "hey chat" },
+  { user: "moth", delay: 6000, text: "hi!!" },
+  { user: "moth", delay: 9000, text: "how's it goin?" },
+  { user: "iyrsbot", delay: 14000, text: "OK 200" },
+  { user: "hazellyn", delay: 20000, text: "lol" },
+];
+
+const MESSAGE_EFFECTS = [
+  {
+    match: "ok",
+    effect: (el) => {
+      el.style.color = "#4f4";
+      el.style.fontWeight = "700";
+    },
+  },
+];
+
+const FILE_EFFECTS = [
+  {
+    match: "PICTURE_20160812",
+    effect: () => addSystemMsg("..."),
+  },
+];
+
+let fakeMsgIdx = 0;
+let fakeMsgTimeout = null;
+
+function scheduleFakeMessages() {
+  fakeMsgIdx = 0;
+  scheduleNext();
+}
+
+function scheduleNext() {
+  if (fakeMsgIdx >= FAKE_MESSAGES.length) return;
+  const msg = FAKE_MESSAGES[fakeMsgIdx];
+  fakeMsgTimeout = setTimeout(() => {
+    if (!iyrsOpen) return;
+    const user = FAKE_USERS.find((u) => u.name === msg.user) || {
+      name: msg.user,
+      color: "#aaa",
+    };
+    addRoomMsg(user, msg.text);
+    fakeMsgIdx++;
+    scheduleNext();
+  }, msg.delay);
+}
+
+function stopFakeMessages() {
+  clearTimeout(fakeMsgTimeout);
+  fakeMsgTimeout = null;
+  fakeMsgIdx = 0;
+}
+
+function applyEffects(el, text) {
+  const lower = text.toLowerCase();
+  MESSAGE_EFFECTS.forEach(({ match, effect }) => {
+    if (lower.includes(match.toLowerCase())) effect(el);
+  });
+}
+
+export function addRoomMsg(user, text) {
+  const msgs = document.getElementById("iy-messages");
+  document.getElementById("iy-greeting").classList.add("hidden");
+
+  const d = document.createElement("div");
+  d.className = "msg room";
+  d.innerHTML = `<span class="msg-user" style="color:${user.color};font-size:10px;font-family:'Geist Mono',monospace;display:block;margin-bottom:2px;">${user.name}</span>${escapeHtml(text)}`;
+  msgs.appendChild(d);
+  msgs.scrollTop = msgs.scrollHeight;
+  applyEffects(d, text);
+  return d;
+}
+
 export function addUserMsg(text) {
   const msgs = document.getElementById("iy-messages");
+  document.getElementById("iy-greeting").classList.add("hidden");
   const d = document.createElement("div");
   d.className = "msg user";
+  d.innerHTML = `<span class="msg-user" style="color:#ccc;font-size:10px;font-family:'Geist Mono',monospace;display:block;margin-bottom:2px;">you</span>${escapeHtml(text)}`;
+  msgs.appendChild(d);
+  msgs.scrollTop = msgs.scrollHeight;
+  applyEffects(d, text);
+}
+
+export function addSystemMsg(text) {
+  const msgs = document.getElementById("iy-messages");
+  const d = document.createElement("div");
+  d.className = "msg system";
   d.textContent = text;
+  d.style.cssText =
+    "align-self:center;font-size:9px;color:#555;letter-spacing:2px;text-align:center;background:none;border:none;padding:2px 0;";
   msgs.appendChild(d);
   msgs.scrollTop = msgs.scrollHeight;
 }
 
-export function addAiMsg(text) {
+function addFileMsg(filename, localUrl, mimeType) {
   const msgs = document.getElementById("iy-messages");
+  document.getElementById("iy-greeting").classList.add("hidden");
+
   const d = document.createElement("div");
-  d.className = "msg ai";
-  d.textContent = text;
+  d.className = "msg user";
+
+  if (mimeType && mimeType.startsWith("image/")) {
+    d.innerHTML = `<span class="msg-user" style="color:#ccc;font-size:10px;font-family:'Geist Mono',monospace;display:block;margin-bottom:4px;">you · ${escapeHtml(filename)}</span><img src="${localUrl}" style="max-width:200px;max-height:160px;border:1px solid #ffdd0066;display:block;">`;
+  } else if (mimeType && mimeType.startsWith("video/")) {
+    d.innerHTML = `<span class="msg-user" style="color:#ccc;font-size:10px;font-family:'Geist Mono',monospace;display:block;margin-bottom:4px;">you · ${escapeHtml(filename)}</span><video src="${localUrl}" controls style="max-width:220px;border:1px solid #4af4;display:block;"></video>`;
+  } else {
+    d.innerHTML = `<span class="msg-user" style="color:#ccc;font-size:10px;font-family:'Geist Mono',monospace;display:block;margin-bottom:2px;">you</span>📎 ${escapeHtml(filename)}`;
+  }
+
   msgs.appendChild(d);
   msgs.scrollTop = msgs.scrollHeight;
+
+  const lower = filename.toLowerCase();
+  FILE_EFFECTS.forEach(({ match, effect }) => {
+    if (lower.includes(match.toLowerCase())) effect(filename, localUrl);
+  });
+}
+
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 export function iyrsNotImpl(e) {
   e?.preventDefault();
-  addAiMsg("not implemented yet.");
-  document.getElementById("iy-greeting").classList.add("hidden");
+  addSystemMsg("not available yet.");
 }
 
 export function iyrsSubmit() {
@@ -53,8 +169,19 @@ export function iyrsSubmit() {
   if (!val) return;
   addUserMsg(val);
   inp.value = "";
-  setTimeout(() => addAiMsg("not implemented yet."), 400 + Math.random() * 600);
-  document.getElementById("iy-greeting").classList.add("hidden");
+}
+
+export function iyrsFileUpload() {
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = "*/*";
+  input.onchange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    addFileMsg(file.name, url, file.type);
+  };
+  input.click();
 }
 
 export function openIyrs() {
@@ -65,6 +192,7 @@ export function openIyrs() {
   const vhs = document.getElementById("vhs-overlay");
   document.getElementById("iy-greeting").classList.remove("hidden");
   document.getElementById("iy-messages").innerHTML = "";
+  addSystemMsg("connected to new");
   vhs.style.opacity = "1";
   setTimeout(() => {
     ov.classList.remove("settled");
@@ -76,11 +204,13 @@ export function openIyrs() {
       ov.classList.add("settled");
     }, 1400);
   }, 400);
+  scheduleFakeMessages();
 }
 
 export function closeIyrs() {
   if (!iyrsOpen) return;
   iyrsOpen = false;
+  stopFakeMessages();
   const ov = document.getElementById("iyrs-overlay");
   const vhs = document.getElementById("vhs-overlay");
   ov.style.opacity = "0";
@@ -139,7 +269,6 @@ function triggerGlitch() {
     ticks++;
     const intensity = ticks / totalTicks;
     body.style.transform = `translate(${(Math.random() - 0.5) * intensity * 30}px,${(Math.random() - 0.5) * intensity * 20}px) skew(${(Math.random() - 0.5) * intensity * 5}deg)`;
-
     if (ticks >= totalTicks) {
       clearInterval(glitchInterval);
       glitchInterval = null;
@@ -161,4 +290,5 @@ document.addEventListener("keydown", (e) => {
 
 window.iyrsNotImpl = iyrsNotImpl;
 window.iyrsSubmit = iyrsSubmit;
+window.iyrsFileUpload = iyrsFileUpload;
 window.closeIyrs = closeIyrs;

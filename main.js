@@ -24,6 +24,7 @@ import {
   paintMat,
   motionBlurMat,
   wireframeMat,
+  chromaticMat,
 } from "./src/materials.js";
 import {
   initModelGroup,
@@ -49,6 +50,8 @@ import {
   activatedataMenu,
   tickOpacity,
   showdataPopup,
+  openSubMenu,
+  closeSubMenu,
 } from "./src/nav.js";
 import {
   drawPost,
@@ -62,6 +65,15 @@ import {
 import { isIyrsOpen, openIyrs, anotherChance } from "./src/iyrs.js";
 import { initMobile } from "./src/mobile.js";
 import { initPaintTex, paintAt } from "./src/paint.js";
+import {
+  initPost,
+  renderPost,
+  setPostMotionBlur,
+  setPostChromatic,
+  setBlurVelocity,
+  setChromaticStrength,
+} from "./src/post.js";
+
 initScene();
 initModelGroup(scene, curMat);
 
@@ -72,6 +84,13 @@ const artifactGroup = new THREE.Group();
 scene.add(artifactGroup);
 
 initNav(artifactGroup);
+
+const postReady = initPost(renderer, scene, camera);
+
+if (postReady) {
+  setPostChromatic(true, 0.6);
+  setPostMotionBlur(true, 0.0);
+}
 
 const randomdonut = Math.random() < 0.08;
 if (randomdonut) {
@@ -267,12 +286,6 @@ Object.entries(meshHandlers).forEach(([id, handler]) => {
   }
 });
 
-document.getElementById("ctx-mesh-milk").addEventListener("click", () => {
-  ctxMenu.style.display = "none";
-  loadGLTF(
-    "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/CesiumMilkTruck/glTF/CesiumMilkTruck.gltf",
-  );
-});
 document.getElementById("ctx-upload-model").addEventListener("click", () => {
   ctxMenu.style.display = "none";
   document.getElementById("model-upload").click();
@@ -380,9 +393,8 @@ document.addEventListener(
   { passive: false },
 );
 
-document.addEventListener("click", () => {
+function handleClick(raycaster) {
   if (isIyrsOpen()) return;
-  raycaster.setFromCamera(mouse, camera);
   const li = raycaster.intersectObjects(clickables);
   const mi = raycaster.intersectObjects(getModelGroup().children, true);
   if (li.length) {
@@ -396,7 +408,12 @@ document.addEventListener("click", () => {
       return;
     }
     if (returnNode && obj === returnNode.mesh) {
-      activateMe(restoreModel);
+      if (obj.userData.isReturnToData) {
+        closeSubMenu();
+      } else {
+        closeSubMenu();
+        activateMe(restoreModel);
+      }
       return;
     }
     if (dataNode && obj === dataNode.mesh) {
@@ -405,7 +422,13 @@ document.addEventListener("click", () => {
       activatedataMenu(artifactGroup);
       return;
     }
-    if (obj.userData.isdataEntry) {
+
+    if (obj.userData.isSubMenuHub) {
+      openSubMenu(obj.userData.subEntries);
+      return;
+    }
+
+    if (obj.userData.isDataEntry && obj.userData.popup) {
       showdataPopup(obj.userData.popup);
       return;
     }
@@ -414,6 +437,11 @@ document.addEventListener("click", () => {
   } else if (mi.length) {
     document.getElementById("model-upload").click();
   }
+}
+
+document.addEventListener("click", () => {
+  raycaster.setFromCamera(mouse, camera);
+  handleClick(raycaster);
 });
 
 initMobile({
@@ -424,34 +452,7 @@ initMobile({
     mouse.x = (clientX / innerWidth) * 2 - 1;
     mouse.y = -((clientY / innerHeight) * 2 - 1);
     raycaster.setFromCamera(mouse, camera);
-    const li = raycaster.intersectObjects(clickables);
-    if (li.length) {
-      const obj = li[0].object;
-      if (obj === hubFriends?.mesh) {
-        activateFriends(artifactGroup);
-        return;
-      }
-      if (obj === hubServices?.mesh) {
-        activateServices(artifactGroup);
-        return;
-      }
-      if (returnNode && obj === returnNode.mesh) {
-        activateMe(restoreModel);
-        return;
-      }
-      if (dataNode && obj === dataNode.mesh) {
-        const mg = getModelGroup();
-        while (mg.children.length) mg.remove(mg.children[0]);
-        activatedataMenu(artifactGroup);
-        return;
-      }
-      if (obj.userData.isdataEntry) {
-        showdataPopup(obj.userData.popup);
-        return;
-      }
-      const u = obj.userData.url;
-      if (u) window.open(u, "_blank");
-    }
+    handleClick(raycaster);
   },
   onHoldStart: () => {
     if (!isIyrsOpen()) openIyrs();
@@ -495,8 +496,22 @@ function animate() {
 
   const rotVelY = artifactGroup.rotation.y - prevRotY;
   const rotVelX = artifactGroup.rotation.x - prevRotX;
+  const totalVel = Math.abs(rotVelY) + Math.abs(rotVelX);
+
   if (motionBlurMat.uniforms?.uVelocity)
     motionBlurMat.uniforms.uVelocity.value.set(rotVelY * 10, rotVelX * 10, 0);
+  if (postReady) setBlurVelocity(totalVel);
+
+  if (postReady) {
+    const isChromaticActive = !getCustomMat() && curMat() === chromaticMat;
+    if (isChromaticActive) {
+      setChromaticStrength(1.8 + Math.sin(t * 0.4) * 0.4);
+    } else {
+      const velChrom = 0.6 + Math.min(totalVel * 8, 1.2);
+      setChromaticStrength(velChrom);
+    }
+  }
+
   prevRotY = artifactGroup.rotation.y;
   prevRotX = artifactGroup.rotation.x;
 
@@ -585,7 +600,12 @@ function animate() {
     ),
   );
 
-  renderer.render(scene, camera);
+  if (postReady) {
+    renderPost(renderer, scene, camera);
+  } else {
+    renderer.render(scene, camera);
+  }
+
   drawPost(mousePosNX, mousePosNY);
 }
 animate();
