@@ -435,17 +435,7 @@ export function mountForest(container) {
     document.removeEventListener("pointerlockchange", onPLC);
     if (document.pointerLockElement === canvas) document.exitPointerLock();
     r.dispose();
-
-    if (typeof closeScene === "function") closeScene("forest");
-    else if (window._closeActiveScene) window._closeActiveScene();
   }
-
-  document.addEventListener("keydown", function escHandler(e) {
-    if (e.key === "Escape") {
-      document.removeEventListener("keydown", escHandler);
-      cleanup();
-    }
-  });
 
   return cleanup;
 }

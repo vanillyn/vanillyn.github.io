@@ -72,7 +72,6 @@ export function closeScene(id) {
     if (typeof activeCleanup === "function") activeCleanup();
     activeCleanup = null;
     container.innerHTML = "";
-
     SCENES[closing]?.onClose?.();
   }, 500);
 }
@@ -197,10 +196,12 @@ const SCENES = {
     },
   },
 };
+
 let _iyrsStartTime = 0;
 let _iyrsFakeMsgTimeout = null;
 let _iyrsFakeMsgIdx = 0;
-let _iyrsHoldTimer = null;
+let _iyrsStatInterval = null;
+let _iyrsContainer = null;
 
 const _BOT_USERS = [
   { name: "hazellyn", color: "#7af" },
@@ -236,6 +237,7 @@ const _FILE_TRIGGERS = [
 ];
 
 function _iyrsMount(container) {
+  _iyrsContainer = container;
   _iyrsStartTime = Date.now();
 
   container.innerHTML = _iyrsHTML();
@@ -244,7 +246,7 @@ function _iyrsMount(container) {
   const vhsCv = container.querySelector("#iy-vhs-canvas");
   _startVhs(vhsCv);
 
-  const statInterval = setInterval(() => {
+  _iyrsStatInterval = setInterval(() => {
     const n = container.querySelector("#sb-nodes");
     const l = container.querySelector("#sb-latency");
     const u = container.querySelector("#sb-uptime");
@@ -275,9 +277,7 @@ function _iyrsMount(container) {
 
   container.querySelector("#nav-about").onclick = (e) => {
     e.preventDefault();
-    _showIyrsPopup(container, {
-      type: "about",
-    });
+    _showIyrsPopup(container, { type: "about" });
   };
   container.querySelector("#nav-source").onclick = (e) => {
     e.preventDefault();
@@ -286,14 +286,14 @@ function _iyrsMount(container) {
   container.querySelector("#nav-signin").onclick = (e) => {
     e.preventDefault();
     closeScene("iyrs");
-    launchScene("forest");
+    setTimeout(() => launchScene("forest"), 10);
   };
 
   container.addEventListener("click", (e) => {
     if (e.target.id === "iy-contact-link") {
       e.preventDefault();
       closeScene("iyrs");
-      launchScene("mirrors");
+      setTimeout(() => launchScene("mirrors"), 10);
     }
   });
 
@@ -311,20 +311,18 @@ function _iyrsMount(container) {
   window.iyrsSubmit = () => _iyrsSubmit(container);
   window.iyrsFileUpload = () => _iyrsFileUpload(container);
   window.closeIyrs = () => closeScene("iyrs");
-
-  return function cleanup() {
-    clearInterval(statInterval);
-    clearTimeout(_iyrsFakeMsgTimeout);
-    _iyrsFakeMsgTimeout = null;
-  };
-}
-
-function _iyrsOnClose() {
-  clearTimeout(_iyrsFakeMsgTimeout);
-  _iyrsFakeMsgTimeout = null;
 }
 
 function _iyrsCleanup() {}
+
+function _iyrsOnClose() {
+  clearTimeout(_iyrsFakeMsgTimeout);
+  clearInterval(_iyrsStatInterval);
+  _iyrsFakeMsgTimeout = null;
+  _iyrsStatInterval = null;
+  _iyrsContainer = null;
+  cancelAnimationFrame(_vhsRaf);
+}
 
 function _showIyrsPopup(container, opts) {
   let popup = container.querySelector("#iy-popup");
@@ -372,7 +370,7 @@ function _scheduleNextFake(container) {
       name: msg.user,
       color: "#aaa",
     };
-    _iyrsAddRoomMsg(user, msg.text);
+    _iyrsAddRoomMsg(user, msg.text, container);
     _iyrsFakeMsgIdx++;
     _scheduleNextFake(container);
   }, msg.delay);
@@ -382,7 +380,7 @@ function _iyrsSubmit(container) {
   const inp = container.querySelector("#iy-input");
   const val = inp.value.trim();
   if (!val) return;
-  _iyrsAddUserMsg(val);
+  _iyrsAddUserMsg(val, container);
   inp.value = "";
 
   const lower = val.toLowerCase();
@@ -402,7 +400,7 @@ function _iyrsFileUpload(container) {
     const file = e.target.files[0];
     if (!file) return;
     const url = URL.createObjectURL(file);
-    _iyrsAddFileMsg(file.name, url, file.type);
+    _iyrsAddFileMsg(file.name, url, file.type, container);
     const lower = file.name.toLowerCase();
     _FILE_TRIGGERS.forEach(({ match, effect }) => {
       if (lower.includes(match.toLowerCase())) effect(file.name, url);
@@ -411,10 +409,12 @@ function _iyrsFileUpload(container) {
   input.click();
 }
 
-function _iyrsAddRoomMsg(user, text) {
-  const msgs = document.getElementById("iy-messages");
+function _iyrsAddRoomMsg(user, text, container) {
+  const c = container || _iyrsContainer;
+  if (!c) return;
+  const msgs = c.querySelector("#iy-messages");
   if (!msgs) return;
-  document.getElementById("iy-greeting")?.classList.add("hidden");
+  c.querySelector("#iy-greeting")?.classList.add("hidden");
   const d = document.createElement("div");
   d.className = "msg room";
   d.innerHTML = `<span class="msg-user" style="color:${user.color}">${_esc(user.name)}</span>${_esc(text)}`;
@@ -423,10 +423,12 @@ function _iyrsAddRoomMsg(user, text) {
   _applyMsgEffects(d, text);
 }
 
-function _iyrsAddUserMsg(text) {
-  const msgs = document.getElementById("iy-messages");
+function _iyrsAddUserMsg(text, container) {
+  const c = container || _iyrsContainer;
+  if (!c) return;
+  const msgs = c.querySelector("#iy-messages");
   if (!msgs) return;
-  document.getElementById("iy-greeting")?.classList.add("hidden");
+  c.querySelector("#iy-greeting")?.classList.add("hidden");
   const d = document.createElement("div");
   d.className = "msg user";
   d.innerHTML = `<span class="msg-user" style="color:#ccc">you</span>${_esc(text)}`;
@@ -435,8 +437,10 @@ function _iyrsAddUserMsg(text) {
   _applyMsgEffects(d, text);
 }
 
-function _iyrsAddSystemMsg(text) {
-  const msgs = document.getElementById("iy-messages");
+function _iyrsAddSystemMsg(text, container) {
+  const c = container || _iyrsContainer;
+  if (!c) return;
+  const msgs = c.querySelector("#iy-messages");
   if (!msgs) return;
   const d = document.createElement("div");
   d.className = "msg system";
@@ -447,14 +451,12 @@ function _iyrsAddSystemMsg(text) {
   msgs.scrollTop = msgs.scrollHeight;
 }
 
-function _iyrsAddSystemMsg_pub(text) {
-  _iyrsAddSystemMsg(text);
-}
-
-function _iyrsAddFileMsg(filename, localUrl, mimeType) {
-  const msgs = document.getElementById("iy-messages");
+function _iyrsAddFileMsg(filename, localUrl, mimeType, container) {
+  const c = container || _iyrsContainer;
+  if (!c) return;
+  const msgs = c.querySelector("#iy-messages");
   if (!msgs) return;
-  document.getElementById("iy-greeting")?.classList.add("hidden");
+  c.querySelector("#iy-greeting")?.classList.add("hidden");
   const d = document.createElement("div");
   d.className = "msg user";
   if (mimeType?.startsWith("image/")) {
@@ -546,12 +548,6 @@ function _startVhs(cv) {
     ctx.drawImage(grainCv, 0, 0, w, h);
   }
   draw();
-
-  const origClose = SCENES.iyrs.onClose;
-  SCENES.iyrs.onClose = function () {
-    cancelAnimationFrame(_vhsRaf);
-    origClose?.();
-  };
 }
 
 function _makeExitBtn(onClick) {
