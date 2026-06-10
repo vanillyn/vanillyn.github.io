@@ -73,7 +73,7 @@ export function closeScene(id) {
     activeCleanup = null;
     container.innerHTML = "";
     SCENES[closing]?.onClose?.();
-  }, 500);
+  }, 10);
 }
 
 export function launchScene(id) {
@@ -208,23 +208,38 @@ const _BOT_USERS = [
   { name: "vanillyn", color: "#f9a" },
   { name: "moth", color: "#af7" },
   { name: "iyrsbot", color: "#fa4", isBot: true },
+  { name: "echo", color: "#d8f" },
+  { name: "clover", color: "#6e8" },
+  { name: "toast", color: "#fb7" },
 ];
 
 const _FAKE_MESSAGES = [
+  { user: "iyrs", delay: 100, text: "scene.iyrs" },
   { user: "vanillyn", delay: 4000, text: "hey chat" },
   { user: "moth", delay: 6000, text: "hi!!" },
   { user: "moth", delay: 9000, text: "how's it goin?" },
   { user: "iyrsbot", delay: 14000, text: "OK 200" },
   { user: "hazellyn", delay: 20000, text: "lol" },
+  { user: "toast", delay: 23000, text: "is the bot broken again" },
+  { user: "echo", delay: 26000, text: "WHERE DID MY SWEET BOT GO" },
+  { user: "toast", delay: 27000, text: "bot.ping" },
+  { user: "iyrsbot", delay: 27200, text: "ERROR 500" },
+  { user: "clover", delay: 32000, text: "see what you did" },
+  { user: "toast", delay: 35000, text: "i didnt do anything i swear" },
+  { user: "vanillyn", delay: 40000, text: "yuh" },
+  { user: "hazellyn", delay: 45000, text: "im gonna reboot it" },
+  { user: "iyrsbot", delay: 52000, text: "OK 200" },
+  { user: "moth", delay: 53000, text: "yay back to normal :3" },
 ];
 
 const _MESSAGE_TRIGGERS = [
   { match: "scene.test", handler: () => launchScene("cube") },
+  { match: "bot.ping", handler: () => _iyrsAddSystemMsg("pinging iyrs...") },
 ];
 
 const _MESSAGE_EFFECTS = [
   {
-    match: "ok",
+    match: "ok 200",
     effect: (el) => {
       el.style.color = "#4f4";
       el.style.fontWeight = "700";

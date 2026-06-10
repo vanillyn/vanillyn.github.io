@@ -34,7 +34,7 @@ export function mountMirrors(container) {
   const hint = document.createElement("div");
   hint.style.cssText =
     "position:absolute;bottom:28px;left:50%;transform:translateX(-50%);font-family:'Geist Mono',monospace;font-size:10px;color:rgba(160,160,220,0.4);letter-spacing:2px;pointer-events:none;user-select:none;transition:opacity 1.5s;";
-  hint.textContent = "click to look · wasd to move · esc to exit";
+  hint.textContent = "you'll find us at the end.";
   container.appendChild(hint);
   setTimeout(() => {
     hint.style.opacity = "0";
