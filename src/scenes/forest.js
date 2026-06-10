@@ -37,46 +37,76 @@ export function mountForest(container) {
   r.shadowMap.type = THREE.PCFSoftShadowMap;
   r.setClearColor(0x010804);
   r.toneMapping = THREE.ACESFilmicToneMapping;
-  r.toneMappingExposure = 0.42;
+  r.toneMappingExposure = 0.72;
 
   const scene = new THREE.Scene();
-  scene.fog = new THREE.FogExp2(0x010804, 0.055);
+  scene.fog = new THREE.FogExp2(0x010804, 0.028);
   scene.background = new THREE.Color(0x010804);
 
   const cam = new THREE.PerspectiveCamera(
     72,
     window.innerWidth / window.innerHeight,
     0.05,
-    120,
+    140,
   );
   cam.position.set(0, 1.72, 12);
 
   const rng = mulberry32(7);
 
-  scene.add(new THREE.AmbientLight(0x0a1a0a, 2.5));
+  scene.add(new THREE.AmbientLight(0x1a2a18, 5));
 
-  const moon = new THREE.DirectionalLight(0x99aacc, 0.3);
+  const moon = new THREE.DirectionalLight(0xbbccdd, 0.9);
   moon.position.set(-12, 28, -8);
   moon.castShadow = true;
   moon.shadow.mapSize.set(2048, 2048);
-  moon.shadow.camera.left = -28;
-  moon.shadow.camera.right = 28;
-  moon.shadow.camera.top = 28;
-  moon.shadow.camera.bottom = -28;
-  moon.shadow.camera.far = 80;
+  moon.shadow.camera.left = -36;
+  moon.shadow.camera.right = 36;
+  moon.shadow.camera.top = 36;
+  moon.shadow.camera.bottom = -36;
+  moon.shadow.camera.far = 100;
   moon.shadow.bias = -0.001;
   scene.add(moon);
 
-  const moonFill = new THREE.DirectionalLight(0x223344, 0.08);
+  const moonFill = new THREE.DirectionalLight(0x334455, 0.22);
   moonFill.position.set(8, 10, 6);
   scene.add(moonFill);
 
-  const groundTex = makeProceduralGround(512);
+  const groundGlow = new THREE.PointLight(0x223a18, 1.8, 22);
+  groundGlow.position.set(0, 0.2, 0);
+  scene.add(groundGlow);
+
+  const texLoader = new THREE.TextureLoader();
+
+  function loadTex(url, repeat = 1) {
+    const t = texLoader.load(url);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.repeat.set(repeat, repeat);
+    return t;
+  }
+
+  const groundFallbackTex = makeProceduralGround(512);
   const groundMat = new THREE.MeshLambertMaterial({
-    map: groundTex,
+    map: groundFallbackTex,
     color: 0x223318,
   });
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(80, 120), groundMat);
+
+  const groundColorTex = loadTex(
+    "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/4k/mud_forest/mud_forest_diff_4k.jpg",
+    10,
+  );
+  groundColorTex.addEventListener?.("update", () => {
+    groundMat.map = groundColorTex;
+    groundMat.needsUpdate = true;
+  });
+
+  setTimeout(() => {
+    if (groundColorTex.image) {
+      groundMat.map = groundColorTex;
+      groundMat.needsUpdate = true;
+    }
+  }, 2000);
+
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(100, 140), groundMat);
   ground.rotation.x = -Math.PI / 2;
   ground.position.set(0, 0, -20);
   ground.receiveShadow = true;
@@ -87,13 +117,29 @@ export function mountForest(container) {
     map: pathTex,
     color: 0x554433,
   });
-  const path = new THREE.Mesh(new THREE.PlaneGeometry(2.8, 120), pathMat);
+  const path = new THREE.Mesh(new THREE.PlaneGeometry(2.8, 140), pathMat);
   path.rotation.x = -Math.PI / 2;
   path.position.set(0, 0.003, -20);
   path.receiveShadow = true;
   scene.add(path);
 
-  const barkMat = new THREE.MeshLambertMaterial({ color: 0x0d1409 });
+  const barkTex = makeProceduralBark(256);
+  const barkMat = new THREE.MeshLambertMaterial({
+    map: barkTex,
+    color: 0x0d1409,
+  });
+
+  const phBark = loadTex(
+    "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/bark_willow_02/bark_willow_02_diff_1k.jpg",
+    2,
+  );
+  setTimeout(() => {
+    if (phBark.image) {
+      barkMat.map = phBark;
+      barkMat.needsUpdate = true;
+    }
+  }, 2000);
+
   const foliage1 = new THREE.MeshLambertMaterial({
     color: 0x091208,
     side: THREE.DoubleSide,
@@ -107,48 +153,86 @@ export function mountForest(container) {
     side: THREE.DoubleSide,
   });
 
-  function makeTree(x, z, h, radius, foliageMat) {
-    const trunkH = h * 0.2;
-    const trunk = new THREE.Mesh(
-      new THREE.CylinderGeometry(radius * 0.1, radius * 0.16, trunkH, 7),
-      barkMat,
-    );
-    trunk.position.set(x, trunkH * 0.5, z);
-    trunk.castShadow = true;
-    scene.add(trunk);
+  function makeTree(x, z, h, radius, foliageMat, rngLocal) {
+    const ng = rngLocal || rng;
+    const trunkH = h * 0.22;
+    const trunkSeg = 5 + Math.floor(ng() * 3);
 
-    for (let t = 0; t < 4; t++) {
-      const f = t / 4;
-      const cr = radius * (1.0 - f * 0.32);
-      const ch = h * (0.52 - f * 0.1);
-      const cy = trunkH + h * f * 0.38;
+    let ty = 0;
+    let tx = x,
+      tz = z;
+    for (let seg = 0; seg < trunkSeg; seg++) {
+      const segH = trunkH / trunkSeg;
+      const r0 = radius * 0.16 * (1 - (seg / trunkSeg) * 0.5);
+      const r1 = radius * 0.16 * (1 - ((seg + 1) / trunkSeg) * 0.5);
+      const trunk = new THREE.Mesh(
+        new THREE.CylinderGeometry(r1, r0, segH, 7),
+        barkMat,
+      );
+      trunk.position.set(tx, ty + segH / 2, tz);
+      trunk.rotation.z = (ng() - 0.5) * 0.04;
+      trunk.rotation.x = (ng() - 0.5) * 0.04;
+      trunk.castShadow = true;
+      scene.add(trunk);
+      ty += segH;
+      tx += (ng() - 0.5) * 0.04;
+      tz += (ng() - 0.5) * 0.04;
+    }
+
+    const numLayers = 5 + Math.floor(ng() * 3);
+    for (let t = 0; t < numLayers; t++) {
+      const f = t / numLayers;
+      const cr = radius * (1.05 - f * 0.4) * (0.85 + ng() * 0.3);
+      const ch = h * (0.45 - f * 0.08) * (0.9 + ng() * 0.2);
+      const cy = trunkH + h * f * 0.36;
       const cone = new THREE.Mesh(
-        new THREE.ConeGeometry(cr, ch, 8 + Math.floor(rng() * 3)),
+        new THREE.ConeGeometry(cr, ch, 7 + Math.floor(ng() * 4)),
         foliageMat,
       );
-      cone.position.set(x, cy, z);
-      cone.rotation.y = rng() * Math.PI * 2;
+      cone.position.set(tx + (ng() - 0.5) * 0.12, cy, tz + (ng() - 0.5) * 0.12);
+      cone.rotation.y = ng() * Math.PI * 2;
+      cone.rotation.x = (ng() - 0.5) * 0.05;
       cone.castShadow = true;
       scene.add(cone);
     }
+
+    if (h > 9) {
+      for (let b = 0; b < 3; b++) {
+        const ba = ng() * Math.PI * 2;
+        const bh = trunkH * (0.4 + ng() * 0.4);
+        const bl = radius * (0.6 + ng() * 0.8);
+        const branch = new THREE.Mesh(
+          new THREE.CylinderGeometry(radius * 0.03, radius * 0.05, bl, 5),
+          barkMat,
+        );
+        branch.position.set(
+          tx + Math.cos(ba) * bl * 0.4,
+          bh,
+          tz + Math.sin(ba) * bl * 0.4,
+        );
+        branch.rotation.z = Math.cos(ba) * 0.5;
+        branch.rotation.x = Math.sin(ba) * 0.5;
+        scene.add(branch);
+      }
+    }
   }
 
-  for (let i = 0; i < 90; i++) {
+  for (let i = 0; i < 100; i++) {
     const side = i % 2 === 0 ? 1 : -1;
-    const xOff = 2.0 + rng() * 11;
-    const z = -32 + rng() * 58;
-    const h = 5.5 + rng() * 9;
-    const rad = 1.3 + rng() * 1.1;
+    const xOff = 2.0 + rng() * 12;
+    const z = -34 + rng() * 62;
+    const h = 6 + rng() * 11;
+    const rad = 1.4 + rng() * 1.2;
     const mat = [foliage1, foliage2, foliage3][Math.floor(rng() * 3)];
     makeTree(side * xOff, z, h, rad, mat);
   }
 
-  for (let i = 0; i < 28; i++) {
+  for (let i = 0; i < 35; i++) {
     makeTree(
-      (rng() - 0.5) * 34,
-      -28 - rng() * 22,
-      6 + rng() * 12,
-      1.2 + rng() * 1.6,
+      (rng() - 0.5) * 40,
+      -30 - rng() * 28,
+      7 + rng() * 14,
+      1.3 + rng() * 1.8,
       foliage3,
     );
   }
@@ -157,11 +241,11 @@ export function mountForest(container) {
     color: 0x080e05,
     side: THREE.DoubleSide,
   });
-  for (let i = 0; i < 60; i++) {
+  for (let i = 0; i < 70; i++) {
     const side = i % 2 === 0 ? 1 : -1;
     const x = side * (1.8 + rng() * 7);
-    const z = -28 + rng() * 46;
-    const s = 0.25 + rng() * 0.55;
+    const z = -30 + rng() * 52;
+    const s = 0.25 + rng() * 0.6;
     const bush = new THREE.Mesh(new THREE.IcosahedronGeometry(s, 0), bushMat);
     bush.position.set(x, s * 0.6, z);
     bush.rotation.set(rng() * 0.4, rng() * Math.PI * 2, rng() * 0.4);
@@ -169,16 +253,46 @@ export function mountForest(container) {
   }
 
   const logMat = new THREE.MeshLambertMaterial({ color: 0x0c1008 });
-  for (let i = 0; i < 8; i++) {
-    const x = (rng() - 0.5) * 14;
-    const z = -22 + rng() * 28;
+  for (let i = 0; i < 12; i++) {
+    const x = (rng() - 0.5) * 16;
+    const z = -24 + rng() * 32;
     const log = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.09, 0.14, 1.2 + rng() * 1.8, 6),
+      new THREE.CylinderGeometry(0.09, 0.15, 1.4 + rng() * 2.0, 6),
       logMat,
     );
     log.position.set(x, 0.08, z);
-    log.rotation.set(0.1 + rng() * 0.3, rng() * Math.PI, rng() * 0.2);
+    log.rotation.set(0.1 + rng() * 0.25, rng() * Math.PI, rng() * 0.2);
     scene.add(log);
+  }
+
+  const rockMat = new THREE.MeshLambertMaterial({ color: 0x1a1c18 });
+  const rockMat2 = new THREE.MeshLambertMaterial({ color: 0x141612 });
+  function makeRock(x, z, scale, mat) {
+    const geo = new THREE.DodecahedronGeometry(scale * (0.8 + rng() * 0.5), 0);
+    const rock = new THREE.Mesh(geo, mat);
+    rock.position.set(x, scale * 0.3, z);
+    rock.rotation.set(rng() * Math.PI, rng() * Math.PI, rng() * Math.PI);
+    rock.scale.set(
+      1 + (rng() - 0.5) * 0.4,
+      0.6 + rng() * 0.5,
+      1 + (rng() - 0.5) * 0.4,
+    );
+    rock.castShadow = true;
+    rock.receiveShadow = true;
+    scene.add(rock);
+  }
+  for (let i = 0; i < 28; i++) {
+    const side = i % 2 === 0 ? 1 : -1;
+    makeRock(
+      side * (1.5 + rng() * 9),
+      -28 + rng() * 46,
+      0.15 + rng() * 0.55,
+      i % 3 === 0 ? rockMat2 : rockMat,
+    );
+  }
+
+  for (let i = 0; i < 5; i++) {
+    makeRock(-2 + rng() * 4, -14 + rng() * 4, 0.1 + rng() * 0.35, rockMat);
   }
 
   const dz = -11.5;
@@ -197,7 +311,6 @@ export function mountForest(container) {
   }
 
   box(2.6, 0.07, 1.1, wood, 0, 0.78, dz);
-
   for (const [lx, lz] of [
     [-1.2, -0.44],
     [1.2, -0.44],
@@ -206,13 +319,11 @@ export function mountForest(container) {
   ]) {
     box(0.07, 0.78, 0.07, woodDark, lx, 0.39, dz + lz);
   }
-
   const screenMat = new THREE.MeshBasicMaterial({ color: 0x050c0a });
   box(0.95, 0.6, 0.04, screenMat, 0, 1.38, dz - 0.2);
-
   box(0.06, 0.15, 0.06, woodDark, 0, 0.95, dz - 0.2);
 
-  const deskLight = new THREE.PointLight(0xffcc77, 1.6, 8);
+  const deskLight = new THREE.PointLight(0xffcc77, 1.8, 9);
   deskLight.position.set(-0.52, 1.42, dz - 0.28);
   deskLight.castShadow = true;
   deskLight.shadow.mapSize.set(512, 512);
@@ -237,7 +348,6 @@ export function mountForest(container) {
 
   const kbMat = new THREE.MeshLambertMaterial({ color: 0x0f0f12 });
   box(0.72, 0.022, 0.24, kbMat, 0.12, 0.812, dz + 0.28);
-
   const mugMat = new THREE.MeshLambertMaterial({ color: 0x1a1a1e });
   const mugMesh = new THREE.Mesh(
     new THREE.CylinderGeometry(0.055, 0.045, 0.12, 10),
@@ -253,17 +363,102 @@ export function mountForest(container) {
     opacity: 0.12,
     blending: THREE.AdditiveBlending,
   });
+  const steamSprites = [];
   for (let s = 0; s < 3; s++) {
     const sp = new THREE.Sprite(steamMat.clone());
     sp.scale.set(0.06, 0.14, 1);
     sp.position.set(-0.7 + (rng() - 0.5) * 0.06, 0.98 + s * 0.09, dz + 0.1);
     sp.userData.steamIdx = s;
+    sp.userData.phase = rng() * Math.PI * 2;
     scene.add(sp);
+    steamSprites.push(sp);
+  }
+
+  const rayTex = makeGodRayTexture();
+  const rays = [];
+
+  const rayPositions = [
+    { x: -3, z: -5, ry: 0.3, scale: [1.8, 18, 1], opacity: 0.06 },
+    { x: 1.5, z: -10, ry: -0.15, scale: [1.2, 14, 1], opacity: 0.04 },
+    { x: -5, z: -18, ry: 0.5, scale: [2.2, 20, 1], opacity: 0.05 },
+    { x: 4, z: -22, ry: -0.4, scale: [1.4, 16, 1], opacity: 0.035 },
+    { x: -1, z: 3, ry: 0.1, scale: [1.6, 12, 1], opacity: 0.05 },
+  ];
+  rayPositions.forEach((rp) => {
+    const rayMat = new THREE.SpriteMaterial({
+      map: rayTex,
+      transparent: true,
+      opacity: rp.opacity,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      color: 0x88aacc,
+    });
+    const ray = new THREE.Sprite(rayMat);
+    ray.scale.set(rp.scale[0], rp.scale[1], 1);
+    ray.position.set(rp.x, rp.scale[1] / 2 - 1, rp.z);
+    ray.userData.baseOpacity = rp.opacity;
+    ray.userData.phase = Math.random() * Math.PI * 2;
+    scene.add(ray);
+    rays.push(ray);
+  });
+
+  const mistGeo = new THREE.BufferGeometry();
+  const mistCount = 280;
+  const mistPos = new Float32Array(mistCount * 3);
+  const mistPhases = new Float32Array(mistCount);
+  for (let i = 0; i < mistCount; i++) {
+    mistPos[i * 3] = (Math.random() - 0.5) * 28;
+    mistPos[i * 3 + 1] = Math.random() * 3.5;
+    mistPos[i * 3 + 2] = -30 + Math.random() * 50;
+    mistPhases[i] = Math.random() * Math.PI * 2;
+  }
+  mistGeo.setAttribute(
+    "position",
+    new THREE.Float32BufferAttribute(mistPos, 3),
+  );
+  const mistTex = makeGlowSprite(0.4);
+  const mistMat = new THREE.PointsMaterial({
+    map: mistTex,
+    size: 1.8,
+    transparent: true,
+    opacity: 0.04,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    color: 0x6688aa,
+    sizeAttenuation: true,
+  });
+  const mistParticles = new THREE.Points(mistGeo, mistMat);
+  scene.add(mistParticles);
+
+  const puffTex = makeGlowSprite(0.3);
+  const puffs = [];
+  for (let i = 0; i < 40; i++) {
+    const puffMat = new THREE.SpriteMaterial({
+      map: puffTex,
+      transparent: true,
+      opacity: 0.025 + Math.random() * 0.02,
+      blending: THREE.AdditiveBlending,
+      color: 0x445566,
+      depthWrite: false,
+    });
+    const puff = new THREE.Sprite(puffMat);
+    const s = 1.5 + Math.random() * 3.5;
+    puff.scale.set(s, s * 0.5, 1);
+    puff.position.set(
+      (Math.random() - 0.5) * 24,
+      0.3 + Math.random() * 1.8,
+      -28 + Math.random() * 50,
+    );
+    puff.userData.drift = (Math.random() - 0.5) * 0.003;
+    puff.userData.baseOpacity = puffMat.opacity;
+    puff.userData.phase = Math.random() * Math.PI * 2;
+    scene.add(puff);
+    puffs.push(puff);
   }
 
   const ffTex = makeGlowSprite();
   const fireflies = [];
-  for (let i = 0; i < 28; i++) {
+  for (let i = 0; i < 35; i++) {
     const mat = new THREE.SpriteMaterial({
       map: ffTex,
       color: new THREE.Color().setHSL(0.27 + rng() * 0.08, 1, 0.6),
@@ -274,9 +469,9 @@ export function mountForest(container) {
     const ff = new THREE.Sprite(mat);
     ff.scale.set(0.07 + rng() * 0.04, 0.07 + rng() * 0.04, 1);
     ff.position.set(
-      (rng() - 0.5) * 18,
-      0.4 + rng() * 3.2,
-      -4 + (rng() - 0.5) * 30,
+      (rng() - 0.5) * 20,
+      0.4 + rng() * 3.5,
+      -6 + (rng() - 0.5) * 36,
     );
     ff.userData = {
       phase: rng() * Math.PI * 2,
@@ -295,10 +490,10 @@ export function mountForest(container) {
       map: moonTex,
       color: 0xddeeff,
       transparent: true,
-      opacity: 0.82,
+      opacity: 0.88,
     }),
   );
-  moonSprite.scale.set(3.2, 3.2, 1);
+  moonSprite.scale.set(3.8, 3.8, 1);
   moonSprite.position.set(-18, 38, -55);
   scene.add(moonSprite);
 
@@ -308,20 +503,33 @@ export function mountForest(container) {
       map: haloTex,
       color: 0x8899cc,
       transparent: true,
-      opacity: 0.35,
+      opacity: 0.4,
       blending: THREE.AdditiveBlending,
     }),
   );
-  halo.scale.set(10, 10, 1);
+  halo.scale.set(13, 13, 1);
   halo.position.copy(moonSprite.position);
   scene.add(halo);
 
+  const moonShaftMat = new THREE.SpriteMaterial({
+    map: makeGodRayTexture(),
+    transparent: true,
+    opacity: 0.08,
+    blending: THREE.AdditiveBlending,
+    color: 0xaabbdd,
+    depthWrite: false,
+  });
+  const moonShaft = new THREE.Sprite(moonShaftMat);
+  moonShaft.scale.set(8, 55, 1);
+  moonShaft.position.set(-10, 22, -45);
+  scene.add(moonShaft);
+
   const starGeo = new THREE.BufferGeometry();
   const starVerts = [];
-  for (let i = 0; i < 1200; i++) {
+  for (let i = 0; i < 1400; i++) {
     const theta = rng() * Math.PI * 2;
     const phi = Math.acos(2 * rng() - 1);
-    const rad = 90 + rng() * 10;
+    const rad = 95 + rng() * 10;
     starVerts.push(
       rad * Math.sin(phi) * Math.cos(theta),
       rad * Math.abs(Math.cos(phi)) + 5,
@@ -336,9 +544,9 @@ export function mountForest(container) {
     starGeo,
     new THREE.PointsMaterial({
       color: 0xffffff,
-      size: 0.18,
+      size: 0.2,
       transparent: true,
-      opacity: 0.7,
+      opacity: 0.75,
     }),
   );
   scene.add(stars);
@@ -357,14 +565,12 @@ export function mountForest(container) {
     pointerLocked = document.pointerLockElement === canvas;
   }
   document.addEventListener("pointerlockchange", onPLC);
-
   function onMouseMove(e) {
     if (!pointerLocked) return;
     yaw -= e.movementX * 0.0018;
     pitch = Math.max(-0.45, Math.min(0.42, pitch - e.movementY * 0.0018));
   }
   document.addEventListener("mousemove", onMouseMove);
-
   canvas.addEventListener("click", () => {
     canvas.requestPointerLock();
   });
@@ -393,25 +599,61 @@ export function mountForest(container) {
       moveDir.normalize().applyEuler(new THREE.Euler(0, yaw, 0));
     vel.lerp(moveDir.multiplyScalar(SPEED), 0.14);
     cam.position.addScaledVector(vel, dt);
-    cam.position.x = Math.max(-6, Math.min(6, cam.position.x));
-    cam.position.z = Math.max(-26, Math.min(16, cam.position.z));
+    cam.position.x = Math.max(-7, Math.min(7, cam.position.x));
+    cam.position.z = Math.max(-28, Math.min(16, cam.position.z));
     cam.position.y = 1.72;
 
     deskLight.intensity =
-      1.4 + Math.sin(t * 7.1) * 0.06 + Math.sin(t * 17.3) * 0.02;
-    bulb.material.opacity = 0.6 + Math.sin(t * 7.1) * 0.15;
+      1.6 + Math.sin(t * 7.1) * 0.07 + Math.sin(t * 17.3) * 0.025;
+    bulb.material.opacity = 0.65 + Math.sin(t * 7.1) * 0.18;
+
+    steamSprites.forEach((sp) => {
+      sp.position.y += 0.004;
+      sp.material.opacity = Math.max(0, 0.12 - (sp.position.y - 0.98) * 0.15);
+      if (sp.position.y > 1.4) {
+        sp.position.y = 0.98 + sp.userData.steamIdx * 0.09;
+        sp.material.opacity = 0.12;
+      }
+    });
 
     fireflies.forEach((ff) => {
       const d = ff.userData;
-      ff.position.y = d.baseY + Math.sin(t * d.speed + d.phase) * 0.35;
+      ff.position.y = d.baseY + Math.sin(t * d.speed + d.phase) * 0.38;
       ff.position.x += d.driftX;
       ff.position.z += d.driftZ;
-
-      if (ff.position.x > 10) ff.position.x = -10;
-      if (ff.position.x < -10) ff.position.x = 10;
+      if (ff.position.x > 12) ff.position.x = -12;
+      if (ff.position.x < -12) ff.position.x = 12;
       ff.material.opacity =
-        0.15 + Math.abs(Math.sin(t * 1.6 + d.phase * 2.1)) * 0.72;
+        0.15 + Math.abs(Math.sin(t * 1.6 + d.phase * 2.1)) * 0.78;
     });
+
+    rays.forEach((ray) => {
+      ray.material.opacity =
+        ray.userData.baseOpacity *
+        (0.85 + Math.sin(t * 0.4 + ray.userData.phase) * 0.15);
+    });
+
+    moonShaft.material.opacity = 0.07 + Math.sin(t * 0.25) * 0.02;
+
+    const mistPositions = mistGeo.attributes.position.array;
+    for (let i = 0; i < mistCount; i++) {
+      mistPositions[i * 3] += Math.sin(t * 0.15 + mistPhases[i]) * 0.002;
+      mistPositions[i * 3 + 1] += 0.0006;
+      if (mistPositions[i * 3 + 1] > 4.0) mistPositions[i * 3 + 1] = 0;
+    }
+    mistGeo.attributes.position.needsUpdate = true;
+    mistMat.opacity = 0.03 + Math.sin(t * 0.2) * 0.01;
+
+    puffs.forEach((puff) => {
+      puff.position.x += puff.userData.drift;
+      if (puff.position.x > 14) puff.position.x = -14;
+      if (puff.position.x < -14) puff.position.x = 14;
+      puff.material.opacity =
+        puff.userData.baseOpacity *
+        (0.7 + Math.sin(t * 0.3 + puff.userData.phase) * 0.3);
+    });
+
+    groundGlow.intensity = 1.6 + Math.sin(t * 0.3) * 0.3;
 
     stars.rotation.y = t * 0.0008;
 
@@ -447,30 +689,28 @@ function makeProceduralGround(size) {
   ctx.fillStyle = "#0a130a";
   ctx.fillRect(0, 0, size, size);
   const rng = mulberry32(1);
-
-  for (let i = 0; i < 3000; i++) {
+  for (let i = 0; i < 4000; i++) {
     const x = rng() * size,
       y = rng() * size;
-    const g = Math.floor(8 + rng() * 12);
+    const g = Math.floor(8 + rng() * 14);
     ctx.fillStyle = `rgb(${g},${Math.floor(g * 1.6)},${g})`;
     ctx.fillRect(x, y, 1 + Math.floor(rng() * 2), 1 + Math.floor(rng() * 2));
   }
-
-  for (let i = 0; i < 80; i++) {
+  for (let i = 0; i < 100; i++) {
     const x = rng() * size,
       y = rng() * size,
-      r = 8 + rng() * 28;
-    const grd = ctx.createRadialGradient(x, y, 0, x, y, r);
-    grd.addColorStop(0, `rgba(10,22,8,0.7)`);
-    grd.addColorStop(1, `rgba(10,22,8,0)`);
+      rv = 8 + rng() * 28;
+    const grd = ctx.createRadialGradient(x, y, 0, x, y, rv);
+    grd.addColorStop(0, "rgba(10,22,8,0.7)");
+    grd.addColorStop(1, "rgba(10,22,8,0)");
     ctx.fillStyle = grd;
     ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.arc(x, y, rv, 0, Math.PI * 2);
     ctx.fill();
   }
   const tex = new THREE.CanvasTexture(cv);
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(8, 12);
+  tex.repeat.set(10, 14);
   return tex;
 }
 
@@ -481,16 +721,37 @@ function makeProceduralPath(size) {
   ctx.fillStyle = "#2a1c12";
   ctx.fillRect(0, 0, size, size);
   const rng = mulberry32(2);
-  for (let i = 0; i < 2000; i++) {
+  for (let i = 0; i < 2500; i++) {
     const x = rng() * size,
       y = rng() * size;
-    const v = Math.floor(18 + rng() * 18);
+    const v = Math.floor(18 + rng() * 20);
     ctx.fillStyle = `rgb(${v},${Math.floor(v * 0.7)},${Math.floor(v * 0.5)})`;
     ctx.fillRect(x, y, 1 + Math.floor(rng() * 2), 1);
   }
   const tex = new THREE.CanvasTexture(cv);
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(1, 12);
+  tex.repeat.set(1, 14);
+  return tex;
+}
+
+function makeProceduralBark(size) {
+  const cv = document.createElement("canvas");
+  cv.width = cv.height = size;
+  const ctx = cv.getContext("2d");
+  ctx.fillStyle = "#0d0d0a";
+  ctx.fillRect(0, 0, size, size);
+  const rng = mulberry32(9);
+
+  for (let x = 0; x < size; x += 2 + Math.floor(rng() * 4)) {
+    const lightness = Math.floor(10 + rng() * 20);
+    const h = 8 + Math.floor(rng() * (size - 8));
+    const y = Math.floor(rng() * (size - h));
+    ctx.fillStyle = `rgb(${lightness},${Math.floor(lightness * 0.9)},${Math.floor(lightness * 0.7)})`;
+    ctx.fillRect(x, y, 1 + Math.floor(rng() * 2), h);
+  }
+  const tex = new THREE.CanvasTexture(cv);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(2, 4);
   return tex;
 }
 
@@ -507,25 +768,45 @@ function makeGlowSprite(innerStop = 0.0) {
   return new THREE.CanvasTexture(cv);
 }
 
+function makeGodRayTexture() {
+  const cv = document.createElement("canvas");
+  cv.width = 32;
+  cv.height = 128;
+  const ctx = cv.getContext("2d");
+  const grd = ctx.createLinearGradient(0, 0, 32, 0);
+  grd.addColorStop(0, "rgba(255,255,255,0)");
+  grd.addColorStop(0.5, "rgba(255,255,255,1)");
+  grd.addColorStop(1, "rgba(255,255,255,0)");
+  const grdV = ctx.createLinearGradient(0, 0, 0, 128);
+  grdV.addColorStop(0, "rgba(255,255,255,0.8)");
+  grdV.addColorStop(0.6, "rgba(255,255,255,0.4)");
+  grdV.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = grd;
+  ctx.fillRect(0, 0, 32, 128);
+  ctx.globalCompositeOperation = "multiply";
+  ctx.fillStyle = grdV;
+  ctx.fillRect(0, 0, 32, 128);
+  return new THREE.CanvasTexture(cv);
+}
+
 function makeMoonTex() {
   const cv = document.createElement("canvas");
   cv.width = cv.height = 128;
   const ctx = cv.getContext("2d");
   const rng = mulberry32(3);
   const grd = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
-  grd.addColorStop(0, "rgba(220,230,245,1)");
-  grd.addColorStop(0.85, "rgba(190,205,230,0.95)");
+  grd.addColorStop(0, "rgba(225,235,250,1)");
+  grd.addColorStop(0.82, "rgba(195,210,235,0.95)");
   grd.addColorStop(1, "rgba(180,200,230,0)");
   ctx.fillStyle = grd;
   ctx.fillRect(0, 0, 128, 128);
-
-  ctx.globalAlpha = 0.12;
-  for (let i = 0; i < 14; i++) {
+  ctx.globalAlpha = 0.13;
+  for (let i = 0; i < 16; i++) {
     const x = 24 + rng() * 80,
       y = 24 + rng() * 80,
-      r = 2 + rng() * 8;
+      rv = 2 + rng() * 9;
     ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.arc(x, y, rv, 0, Math.PI * 2);
     ctx.fillStyle = "rgba(100,110,140,1)";
     ctx.fill();
   }
