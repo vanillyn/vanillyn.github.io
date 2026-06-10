@@ -1,5 +1,6 @@
 import { bgMat } from "./materials.js";
-
+import { mountForest } from "./scenes/forest.js";
+import { mountMirrors } from "./scenes/mirrors.js";
 export let scene, camera, renderer, clock, raycaster, mouse;
 
 export function initScene() {
@@ -115,6 +116,18 @@ const SCENES = {
     },
   },
 
+  forest: {
+    mount(container) {
+      return mountForest(container);
+    },
+  },
+
+  mirrors: {
+    mount(container) {
+      return mountMirrors(container);
+    },
+  },
+
   cube: {
     mount(container) {
       const canvas = document.createElement("canvas");
@@ -178,7 +191,6 @@ const SCENES = {
     },
   },
 };
-
 let _iyrsStartTime = 0;
 let _iyrsFakeMsgTimeout = null;
 let _iyrsFakeMsgIdx = 0;
@@ -214,7 +226,7 @@ const _MESSAGE_EFFECTS = [
 ];
 
 const _FILE_TRIGGERS = [
-  { match: "PICTURE_20160812", effect: () => _iyrsAddSystemMsg("...") },
+  { match: "PICTURE_20160812", effect: () => _iyrsAddSystemMsg("where") },
 ];
 
 function _iyrsMount(container) {
@@ -254,6 +266,31 @@ function _iyrsMount(container) {
   container.querySelector("#iy-input").addEventListener("keydown", (e) => {
     if (e.key === "Enter") _iyrsSubmit(container);
   });
+
+  container.querySelector("#nav-about").onclick = (e) => {
+    e.preventDefault();
+    _showIyrsPopup(container, {
+      type: "about",
+    });
+  };
+  container.querySelector("#nav-source").onclick = (e) => {
+    e.preventDefault();
+    window.open("https://github.com/vanillyn/vanillyn.github.io", "_blank");
+  };
+  container.querySelector("#nav-signin").onclick = (e) => {
+    e.preventDefault();
+    closeScene("iyrs");
+    setTimeout(() => launchScene("forest"), 300);
+  };
+
+  container.addEventListener("click", (e) => {
+    if (e.target.id === "iy-contact-link") {
+      e.preventDefault();
+      closeScene("iyrs");
+      setTimeout(() => launchScene("mirrors"), 300);
+    }
+  });
+
   container.querySelectorAll("[data-notimpl]").forEach((el) => {
     el.addEventListener("click", (e) => {
       e.preventDefault();
@@ -282,6 +319,43 @@ function _iyrsOnClose() {
 }
 
 function _iyrsCleanup() {}
+
+function _showIyrsPopup(container, opts) {
+  let popup = container.querySelector("#iy-popup");
+  if (!popup) {
+    popup = document.createElement("div");
+    popup.id = "iy-popup";
+    popup.style.cssText = `
+     position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+     background:#fff;border:2px solid #1a3a6e;
+     color:#1a3a6e;font-family:'Geist Mono',monospace;font-size:12px;
+     padding:22px 28px;max-width:360px;width:88vw;
+     letter-spacing:1px;line-height:1.8;z-index:600;
+     pointer-events:auto;box-shadow:0 0 40px rgba(74,170,255,0.12);
+   `;
+    container.appendChild(popup);
+  }
+
+  if (opts.type === "about") {
+    popup.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;border-bottom:1px solid #1a3a6e;padding-bottom:10px;">
+        <span style="font-size:9px;letter-spacing:3px;color:#2a5a8e;text-transform:uppercase;">about</span>
+        <span style="cursor:pointer;opacity:0.4;font-size:16px;" id="iy-popup-close">✕</span>
+      </div>
+      <div style="font-size:13px;color:#1a3a6e;margin-bottom:8px;">(c) iyrs 1992–</div>
+      <div style="font-size:10px;color:#4a7aaa;line-height:1.9;margin-bottom:18px;">
+      chat relayed on the internet
+      </div>
+      <div style="border-top:1px solid #dde6ee;padding-top:12px;font-size:10px;color:#4a8acc;">
+        <a id="iy-contact-link" href="#" style="color:#1a6fcc;text-decoration:none;letter-spacing:2px;border-bottom:1px solid #4af;">contact us</a>
+      </div>
+    `;
+  }
+
+  popup.querySelector("#iy-popup-close")?.addEventListener("click", () => {
+    popup.remove();
+  });
+}
 
 function _scheduleNextFake(container) {
   if (_iyrsFakeMsgIdx >= _FAKE_MESSAGES.length) return;
@@ -500,9 +574,9 @@ function _iyrsHTML() {
       <div id="iy-logo-text" style="font-size:18px;font-weight:600;color:#c8deff;letter-spacing:3px;text-transform:uppercase;font-family:'Geist Mono',monospace;">...</div>
     </div>
     <nav id="iy-nav" style="display:flex;margin-left:20px;">
-      <a href="#" data-notimpl style="color:#7aaad4;font-size:12px;letter-spacing:1px;text-decoration:none;padding:0 16px;height:48px;display:flex;align-items:center;border-left:1px solid rgba(74,170,255,0.1);font-weight:500;text-transform:uppercase;">about</a>
-      <a href="#" data-notimpl style="color:#7aaad4;font-size:12px;letter-spacing:1px;text-decoration:none;padding:0 16px;height:48px;display:flex;align-items:center;border-left:1px solid rgba(74,170,255,0.1);font-weight:500;text-transform:uppercase;">source</a>
-      <a href="#" data-notimpl style="color:#7aaad4;font-size:12px;letter-spacing:1px;text-decoration:none;padding:0 16px;height:48px;display:flex;align-items:center;border-left:1px solid rgba(74,170,255,0.1);font-weight:500;text-transform:uppercase;">sign in</a>
+      <a id="nav-about" href="#" style="color:#7aaad4;font-size:12px;letter-spacing:1px;text-decoration:none;padding:0 16px;height:48px;display:flex;align-items:center;border-left:1px solid rgba(74,170,255,0.1);font-weight:500;text-transform:uppercase;">about</a>
+      <a id="nav-source" href="#" style="color:#7aaad4;font-size:12px;letter-spacing:1px;text-decoration:none;padding:0 16px;height:48px;display:flex;align-items:center;border-left:1px solid rgba(74,170,255,0.1);font-weight:500;text-transform:uppercase;">source</a>
+      <a id="nav-signin" href="#" style="color:#7aaad4;font-size:12px;letter-spacing:1px;text-decoration:none;padding:0 16px;height:48px;display:flex;align-items:center;border-left:1px solid rgba(74,170,255,0.1);font-weight:500;text-transform:uppercase;">sign in</a>
     </nav>
     <span id="iy-close" style="color:#4af;font-size:18px;cursor:pointer;padding:0 8px;opacity:0.5;transition:opacity 0.15s;user-select:none;font-weight:300;">✕</span>
   </div>
@@ -556,6 +630,7 @@ function _iyrsHTML() {
 #iy-greeting.hidden{opacity:0;}
 #iy-messages::-webkit-scrollbar{width:3px;}
 #iy-messages::-webkit-scrollbar-thumb{background:#1a3a6e;border-radius:2px;}
+#iy-nav a:hover{color:#fff;background:rgba(74,170,255,0.06);}
 @media(max-width:600px){#iy-sidebar{display:none;}#iy-main .msg{max-width:90%;}}
 </style>
 `;
