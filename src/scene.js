@@ -102,7 +102,13 @@ export function launchScene(id) {
 }
 
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && activeSceneId) closeScene();
+  if (e.key === "Escape" && activeSceneId) {
+    if (document.pointerLockElement) {
+      document.exitPointerLock();
+      return;
+    }
+    closeScene();
+  }
 });
 
 const SCENES = {
@@ -280,14 +286,14 @@ function _iyrsMount(container) {
   container.querySelector("#nav-signin").onclick = (e) => {
     e.preventDefault();
     closeScene("iyrs");
-    setTimeout(() => launchScene("forest"), 300);
+    launchScene("forest");
   };
 
   container.addEventListener("click", (e) => {
     if (e.target.id === "iy-contact-link") {
       e.preventDefault();
       closeScene("iyrs");
-      setTimeout(() => launchScene("mirrors"), 300);
+      launchScene("mirrors");
     }
   });
 

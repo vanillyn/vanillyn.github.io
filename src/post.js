@@ -138,9 +138,9 @@ export function setPostMotionBlur(enabled, blend = 0.5) {
 export function setBlurVelocity(vel) {
   if (!motionBlurPass) return;
 
-  const blend = Math.min(vel * 5, 0.85);
+  const blend = Math.min(vel * 20, 0.99);
   motionBlurPass.uniforms.uBlend.value = blend;
-  motionBlurPass.uniforms.uEnabled.value = blend > 0.01 ? 1.0 : 0.0;
+  motionBlurPass.uniforms.uEnabled.value = blend > 0.001 ? 1.0 : 0.0;
 }
 
 export function setPostChromatic(enabled, strength = 1.0) {

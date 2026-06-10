@@ -7,6 +7,7 @@ import {
   raycaster,
   mouse,
   openIyrs,
+  launchScene,
   closeIyrs,
   isIyrsOpen,
   anotherChance,
@@ -79,6 +80,7 @@ import {
   setChromaticStrength,
 } from "./src/post.js";
 
+window.launchScene = launchScene;
 initScene();
 initModelGroup(scene, curMat);
 
