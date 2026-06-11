@@ -210,7 +210,7 @@ let _iyrsFakeMsgIdx = 0;
 let _iyrsStatInterval = null;
 let _iyrsContainer = null;
 
-const _BOT_USERS = [
+export const _BOT_USERS = [
   { name: "hazellyn", color: "#7af" },
   { name: "vanillyn", color: "#f9a" },
   { name: "moth", color: "#af7" },
@@ -220,7 +220,7 @@ const _BOT_USERS = [
   { name: "toast", color: "#fb7" },
 ];
 
-const _FAKE_MESSAGES = [
+export const _FAKE_MESSAGES = [
   { user: "iyrs", delay: 100, text: "scene.iyrs" },
   { user: "vanillyn", delay: 4000, text: "hey chat" },
   { user: "moth", delay: 6000, text: "hi!!" },

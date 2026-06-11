@@ -21,7 +21,7 @@ const RETURN_COLOR = "#f44";
 const DATA_NODE_COLOR = "#ffdd00";
 const SETTINGS_NODE_COLOR = "#c8aaff";
 
-const DATA_ENTRIES = [
+export const DATA_ENTRIES = [
   {
     label: "placeholder",
     popup: { type: "text", content: "placeholder text :3" },

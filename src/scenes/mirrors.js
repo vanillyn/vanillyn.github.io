@@ -83,24 +83,90 @@ void main(){
   vec3 n = normalize(vNormal);
   vec3 viewDir = normalize(uCamPos - vWorldPos);
   vec3 r = reflect(-viewDir, n);
-
   float envY = r.y * 0.5 + 0.5;
   float shimmer = sin(uTime * 1.2 + vWorldPos.x * 0.8 + vWorldPos.z * 0.6) * 0.04;
   vec3 envCol = mix(vec3(0.18, 0.22, 0.30), vec3(0.72, 0.82, 1.0), envY + shimmer);
   float fresnel = pow(1.0 - max(0.0, dot(n, viewDir)), 2.2);
-
   vec3 base = vec3(0.78, 0.70, 0.52);
   vec3 col = mix(base * 0.85, envCol, 0.55 + fresnel * 0.35);
-
   float scan = sin(vWorldPos.y * 18.0 + uTime * 0.3) * 0.012 + 1.0;
   col *= scan;
   gl_FragColor = vec4(col, 1.0);
 }`;
 
+function makeVhsOverlay(container) {
+  const cv = document.createElement("canvas");
+  cv.style.cssText =
+    "position:absolute;inset:0;width:100%;height:100%;z-index:8;pointer-events:none;";
+  container.appendChild(cv);
+  const ctx = cv.getContext("2d");
+  const grainCv = document.createElement("canvas");
+  const grainCtx = grainCv.getContext("2d");
+  let t = 0;
+  let raf = null;
+  function draw() {
+    raf = requestAnimationFrame(draw);
+    t++;
+    const w = (cv.width = innerWidth),
+      h = (cv.height = innerHeight);
+    ctx.clearRect(0, 0, w, h);
+    for (let i = 0; i < 6; i++) {
+      const by = Math.random() * h;
+      ctx.fillStyle = `rgba(0,0,0,${0.06 + Math.random() * 0.08})`;
+      ctx.fillRect(0, by, w, 1 + Math.random() * 4);
+    }
+    for (let i = 0; i < 3 + Math.floor(Math.random() * 4); i++) {
+      const fy = Math.floor(Math.random() * h),
+        fw = 20 + Math.random() * 200;
+      const fx = Math.random() * (w - fw),
+        a = 0.04 + Math.random() * 0.06;
+      ctx.fillStyle = `rgba(255,20,60,${a})`;
+      ctx.fillRect(fx, fy, fw, 1);
+      ctx.fillStyle = `rgba(0,140,255,${a})`;
+      ctx.fillRect(fx + 2, fy + 1, fw, 1);
+    }
+    if (Math.random() < 0.1) {
+      const gy = Math.random() * h,
+        gh = Math.random() * 14 + 2;
+      ctx.fillStyle = `rgba(74,170,255,${Math.random() * 0.1})`;
+      ctx.fillRect(0, gy, w, gh);
+    }
+    const scanY = (t * 1.2) % h;
+    const sg = ctx.createLinearGradient(0, scanY - 8, 0, scanY + 8);
+    sg.addColorStop(0, "rgba(180,220,255,0)");
+    sg.addColorStop(0.5, `rgba(180,220,255,${0.04 + Math.random() * 0.03})`);
+    sg.addColorStop(1, "rgba(180,220,255,0)");
+    ctx.fillStyle = sg;
+    ctx.fillRect(0, scanY - 8, w, 16);
+    const gw = Math.floor(w / 3),
+      gh2 = Math.floor(h / 3);
+    grainCv.width = gw;
+    grainCv.height = gh2;
+    const id = grainCtx.createImageData(gw, gh2);
+    const data = id.data;
+    for (let i = 0; i < data.length; i += 4) {
+      const v = Math.random() * 40;
+      data[i] = data[i + 1] = data[i + 2] = v;
+      data[i + 3] = 50;
+    }
+    grainCtx.putImageData(id, 0, 0);
+    ctx.drawImage(grainCv, 0, 0, w, h);
+  }
+  draw();
+  return () => {
+    cancelAnimationFrame(raf);
+    cv.remove();
+  };
+}
+
 export function mountMirrors(container) {
   if (isMobile()) {
     const guard = document.createElement("div");
-    guard.style.cssText = `position:absolute;inset:0;background:#050401;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'Geist Mono',monospace;color:#c8a84b;text-align:center;padding:32px;gap:16px;`;
+    guard.style.cssText = `
+      position:absolute;inset:0;background:#050401;
+      display:flex;flex-direction:column;align-items:center;justify-content:center;
+      font-family:'Geist Mono',monospace;color:#c8a84b;text-align:center;padding:32px;gap:16px;
+    `;
     guard.innerHTML = `
       <div style="font-size:28px;letter-spacing:2px;">🪞</div>
       <div style="font-size:13px;letter-spacing:3px;text-transform:uppercase;">desktop only</div>
@@ -116,9 +182,13 @@ export function mountMirrors(container) {
     "position:absolute;inset:0;width:100%;height:100%;display:block;";
   container.appendChild(canvas);
 
+  const stopVhs = makeVhsOverlay(container);
+
   const hint = document.createElement("div");
   hint.style.cssText =
-    'position:absolute;bottom:28px;left:50%;transform:translateX(-50%);font-family:"Geist Mono",monospace;font-size:10px;color:rgba(220,180,80,0.5);letter-spacing:2px;pointer-events:none;user-select:none;transition:opacity 1.5s;';
+    "position:absolute;bottom:28px;left:50%;transform:translateX(-50%);" +
+    'font-family:"Geist Mono",monospace;font-size:10px;color:rgba(220,180,80,0.5);' +
+    "letter-spacing:2px;pointer-events:none;user-select:none;transition:opacity 1.5s;z-index:10;";
   hint.textContent = "wasd / arrows to move · mouse to look";
   container.appendChild(hint);
   setTimeout(() => {
@@ -215,7 +285,7 @@ export function mountMirrors(container) {
   ceilMesh.position.y = WALL_H;
   scene.add(ceilMesh);
 
-  for (let row = 0; row < MAZE_H; row++)
+  for (let row = 0; row < MAZE_H; row++) {
     for (let col = 0; col < MAZE_W; col++) {
       if (!MAP[row][col]) continue;
       const wp = c2w(col, row);
@@ -228,10 +298,11 @@ export function mountMirrors(container) {
       m.receiveShadow = true;
       scene.add(m);
     }
+  }
 
   const trimH = new THREE.BoxGeometry(CELL, 0.12, 0.04);
   const trimV = new THREE.BoxGeometry(0.04, 0.12, CELL);
-  for (let row = 0; row < MAZE_H; row++)
+  for (let row = 0; row < MAZE_H; row++) {
     for (let col = 0; col < MAZE_W; col++) {
       if (!MAP[row][col]) continue;
       const wp = c2w(col, row);
@@ -253,11 +324,12 @@ export function mountMirrors(container) {
         });
       });
     }
+  }
 
   const pillarGeo = new THREE.CylinderGeometry(0.1, 0.13, WALL_H, 8);
   const capGeo = new THREE.CylinderGeometry(0.16, 0.15, 0.14, 8);
   const baseGeo = new THREE.CylinderGeometry(0.15, 0.16, 0.14, 8);
-  for (let row = 0; row < MAZE_H; row++)
+  for (let row = 0; row < MAZE_H; row++) {
     for (let col = 0; col < MAZE_W; col++) {
       if (!MAP[row][col]) continue;
       const wp = c2w(col, row);
@@ -273,7 +345,7 @@ export function mountMirrors(container) {
         if (nr >= 0 && nr < MAZE_H && nc >= 0 && nc < MAZE_W && !MAP[nr][nc])
           openN++;
       });
-      if (openN < 2) return;
+      if (openN < 2) continue;
       const shaft = new THREE.Mesh(pillarGeo, pillarMat);
       shaft.position.set(wp.x, WALL_H / 2, wp.z);
       shaft.castShadow = true;
@@ -284,6 +356,7 @@ export function mountMirrors(container) {
         scene.add(c);
       });
     }
+  }
 
   const candlePositions = [
     c2w(1, 5),
@@ -384,7 +457,6 @@ export function mountMirrors(container) {
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 8), capsuleMat);
   head.position.y = 1.55;
   charBody.add(torso, head);
-
   scene.add(charBody);
 
   const keys = {};
@@ -511,12 +583,27 @@ export function mountMirrors(container) {
 
   return function cleanup() {
     cancelAnimationFrame(raf);
+    stopVhs();
     window.removeEventListener("keydown", onKey);
     window.removeEventListener("keyup", onKey);
     window.removeEventListener("resize", onResize);
     document.removeEventListener("mousemove", onMouseMove);
     document.removeEventListener("pointerlockchange", onPLC);
     if (document.pointerLockElement === canvas) document.exitPointerLock();
+    [
+      mirrorMat,
+      floorMat,
+      ceilMat,
+      goldMat,
+      pillarMat,
+      flameMat,
+      stickMat,
+      centerMat,
+      orbitMat,
+      capsuleMat,
+    ].forEach((m) => m.dispose?.());
+    [goldTex, flameTex].forEach((t) => t.dispose());
+    [pillarGeo, capGeo, baseGeo, trimH, trimV].forEach((g) => g.dispose());
     r.dispose();
   };
 }
