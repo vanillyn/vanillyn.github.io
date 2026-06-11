@@ -2,7 +2,6 @@ import { bgMat } from "./materials.js";
 import { mountForest } from "./scenes/forest.js";
 import { mountMirrors } from "./scenes/mirrors.js";
 
-import { mountLogin } from "./scenes/login.js";
 import { mountDesktop } from "./scenes/desktop.js";
 export let scene, camera, renderer, clock, raycaster, mouse;
 
@@ -123,11 +122,7 @@ const SCENES = {
       _iyrsOnClose();
     },
   },
-  login: {
-    mount(container) {
-      return mountLogin(container);
-    },
-  },
+
   desktop: {
     mount(container) {
       return mountDesktop(container);
