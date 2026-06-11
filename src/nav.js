@@ -1,15 +1,17 @@
 import { makeLineMat } from "./materials.js";
 import { launchScene } from "./scene.js";
 
-const LINKS_ME = [
-  { label: "neo-polita", url: "https://discord.gg/2KVRMDHCnN" },
-  { label: "hazel/run", url: "https://discord.gg/kH8N2wUmMC" },
-  { label: "github", url: "https://github.com/vanillyn" },
-  { label: "twitch", url: "https://twitch.tv/vanillynBot" },
+export const LINKS_ME = [
+  { label: "neo-polita", url: "https://discord.gg/2KVRMDHCnN", icon: "🌐" },
+  { label: "hazel/run", url: "https://discord.gg/kH8N2wUmMC", icon: "🌐" },
+  { label: "github", url: "https://github.com/vanillyn", icon: "🌐" },
+  { label: "twitch", url: "https://twitch.tv/vanillynBot", icon: "🌐" },
 ];
-const LINKS_FRIENDS = [{ label: "!", url: "https://powuts.straw.page" }];
-const LINKS_SERVICES = [
-  { label: "niskbot", url: "https://vanillyn.github.io/dashboard" },
+export const LINKS_FRIENDS = [
+  { label: "!", url: "https://powuts.straw.page", icon: "🌐" },
+];
+export const LINKS_SERVICES = [
+  { label: "niskbot", url: "https://vanillyn.github.io/dashboard", icon: "🌐" },
 ];
 
 const HUB_FRIENDS_COLOR = "#3af";

@@ -1,3 +1,75 @@
+import { launchScene, closeScene } from "../scene.js";
+
+const DESK_Z = -11.5;
+const DESK_X = 0;
+const MONITOR_INTERACT_DIST = 2.2;
+
+const SCREEN_W = 0.95;
+const SCREEN_H = 0.6;
+const SCREEN_X = 0;
+const SCREEN_Y = 1.38;
+
+function computeMatrix3d(corners, w, h) {
+  const [tl, tr, br, bl] = corners;
+
+  function adj(m) {
+    return [
+      m[4] * m[8] - m[5] * m[7],
+      m[2] * m[7] - m[1] * m[8],
+      m[1] * m[5] - m[2] * m[4],
+      m[5] * m[6] - m[3] * m[8],
+      m[0] * m[8] - m[2] * m[6],
+      m[2] * m[3] - m[0] * m[5],
+      m[3] * m[7] - m[4] * m[6],
+      m[1] * m[6] - m[0] * m[7],
+      m[0] * m[4] - m[1] * m[3],
+    ];
+  }
+  function multmm(a, b) {
+    const c = [];
+    for (let i = 0; i < 3; i++)
+      for (let j = 0; j < 3; j++) {
+        let s = 0;
+        for (let k = 0; k < 3; k++) s += a[3 * i + k] * b[3 * k + j];
+        c[3 * i + j] = s;
+      }
+    return c;
+  }
+  function multmv(m, v) {
+    return [
+      m[0] * v[0] + m[1] * v[1] + m[2] * v[2],
+      m[3] * v[0] + m[4] * v[1] + m[5] * v[2],
+      m[6] * v[0] + m[7] * v[1] + m[8] * v[2],
+    ];
+  }
+  function basisToPoints(p1, p2, p3, p4) {
+    const m = [p1[0], p2[0], p3[0], p1[1], p2[1], p3[1], 1, 1, 1];
+    const v = multmv(adj(m), [p4[0], p4[1], 1]);
+    return multmm(m, [v[0], 0, 0, 0, v[1], 0, 0, 0, v[2]]);
+  }
+  const s = basisToPoints([0, 0], [w, 0], [w, h], [0, h]);
+  const d = basisToPoints(tl, tr, br, bl);
+  const t = multmm(d, adj(s));
+  return [
+    t[0] / t[8],
+    t[3] / t[8],
+    0,
+    t[6] / t[8],
+    t[1] / t[8],
+    t[4] / t[8],
+    0,
+    t[7] / t[8],
+    0,
+    0,
+    1,
+    0,
+    t[2] / t[8],
+    t[5] / t[8],
+    0,
+    1,
+  ];
+}
+
 export function mountForest(container) {
   const canvas = document.createElement("canvas");
   canvas.style.cssText =
@@ -16,6 +88,15 @@ export function mountForest(container) {
     hint.style.opacity = "0";
   }, 4000);
 
+  const monitorHint = document.createElement("div");
+  monitorHint.style.cssText =
+    "position:absolute;bottom:80px;left:50%;transform:translateX(-50%);" +
+    "font-family:'Geist Mono',monospace;font-size:10px;color:rgba(160,210,140,0.0);" +
+    "letter-spacing:3px;pointer-events:none;user-select:none;" +
+    "transition:color 0.4s;white-space:nowrap;";
+  monitorHint.textContent = "[E] use computer";
+  container.appendChild(monitorHint);
+
   const exitBtn = document.createElement("div");
   exitBtn.style.cssText =
     "position:absolute;top:18px;right:22px;font-family:'Geist Mono',monospace;" +
@@ -29,6 +110,60 @@ export function mountForest(container) {
     exitBtn.style.color = "rgba(160,210,140,0.35)";
   };
   container.appendChild(exitBtn);
+
+  const iframeWrap = document.createElement("div");
+  iframeWrap.style.cssText =
+    "position:absolute;top:0;left:0;width:0;height:0;" +
+    "overflow:hidden;pointer-events:none;z-index:5;";
+  container.appendChild(iframeWrap);
+
+  const IFRAME_W = 640;
+  const IFRAME_H = 400;
+
+  const iframe = document.createElement("iframe");
+  iframe.style.cssText =
+    `position:absolute;top:0;left:0;width:${IFRAME_W}px;height:${IFRAME_H}px;` +
+    "border:none;transform-origin:0 0;pointer-events:auto;background:#008080;";
+  iframe.setAttribute("scrolling", "no");
+  iframeWrap.appendChild(iframe);
+
+  let monitorActive = false;
+
+  function showMonitor() {
+    monitorActive = true;
+    iframeWrap.style.pointerEvents = "auto";
+
+    if (document.pointerLockElement) document.exitPointerLock();
+    monitorHint.style.color = "rgba(160,210,140,0)";
+
+    import("./login_inline.js")
+      .then((m) => {
+        iframe.srcdoc = m.getLoginHTML();
+      })
+      .catch(() => {
+        iframe.srcdoc = getLoginSrcdoc();
+      });
+  }
+
+  function hideMonitor() {
+    monitorActive = false;
+    iframeWrap.style.pointerEvents = "none";
+    iframe.style.transform = "matrix3d(1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1)";
+    iframeWrap.style.width = "0";
+    iframeWrap.style.height = "0";
+  }
+
+  function onIframeMessage(e) {
+    if (e.data === "login:success") {
+      hideMonitor();
+      closeScene("forest");
+      setTimeout(() => launchScene("desktop"), 80);
+    }
+    if (e.data === "login:cancel") {
+      hideMonitor();
+    }
+  }
+  window.addEventListener("message", onIframeMessage);
 
   const r = new THREE.WebGLRenderer({ canvas, antialias: true });
   r.setSize(window.innerWidth, window.innerHeight);
@@ -54,7 +189,6 @@ export function mountForest(container) {
   const rng = mulberry32(7);
 
   scene.add(new THREE.AmbientLight(0x1a2a18, 5));
-
   const moon = new THREE.DirectionalLight(0xbbccdd, 0.9);
   moon.position.set(-12, 28, -8);
   moon.castShadow = true;
@@ -66,17 +200,14 @@ export function mountForest(container) {
   moon.shadow.camera.far = 100;
   moon.shadow.bias = -0.001;
   scene.add(moon);
-
   const moonFill = new THREE.DirectionalLight(0x334455, 0.22);
   moonFill.position.set(8, 10, 6);
   scene.add(moonFill);
-
   const groundGlow = new THREE.PointLight(0x223a18, 1.8, 22);
   groundGlow.position.set(0, 0.2, 0);
   scene.add(groundGlow);
 
   const texLoader = new THREE.TextureLoader();
-
   function loadTex(url, repeat = 1) {
     const t = texLoader.load(url);
     t.wrapS = t.wrapT = THREE.RepeatWrapping;
@@ -89,16 +220,10 @@ export function mountForest(container) {
     map: groundFallbackTex,
     color: 0x223318,
   });
-
   const groundColorTex = loadTex(
     "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/4k/mud_forest/mud_forest_diff_4k.jpg",
     10,
   );
-  groundColorTex.addEventListener?.("update", () => {
-    groundMat.map = groundColorTex;
-    groundMat.needsUpdate = true;
-  });
-
   setTimeout(() => {
     if (groundColorTex.image) {
       groundMat.map = groundColorTex;
@@ -128,7 +253,6 @@ export function mountForest(container) {
     map: barkTex,
     color: 0x0d1409,
   });
-
   const phBark = loadTex(
     "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/bark_willow_02/bark_willow_02_diff_1k.jpg",
     2,
@@ -157,9 +281,8 @@ export function mountForest(container) {
     const ng = rngLocal || rng;
     const trunkH = h * 0.22;
     const trunkSeg = 5 + Math.floor(ng() * 3);
-
-    let ty = 0;
-    let tx = x,
+    let ty = 0,
+      tx = x,
       tz = z;
     for (let seg = 0; seg < trunkSeg; seg++) {
       const segH = trunkH / trunkSeg;
@@ -178,10 +301,9 @@ export function mountForest(container) {
       tx += (ng() - 0.5) * 0.04;
       tz += (ng() - 0.5) * 0.04;
     }
-
     const numLayers = 5 + Math.floor(ng() * 3);
-    for (let t = 0; t < numLayers; t++) {
-      const f = t / numLayers;
+    for (let i = 0; i < numLayers; i++) {
+      const f = i / numLayers;
       const cr = radius * (1.05 - f * 0.4) * (0.85 + ng() * 0.3);
       const ch = h * (0.45 - f * 0.08) * (0.9 + ng() * 0.2);
       const cy = trunkH + h * f * 0.36;
@@ -195,7 +317,6 @@ export function mountForest(container) {
       cone.castShadow = true;
       scene.add(cone);
     }
-
     if (h > 9) {
       for (let b = 0; b < 3; b++) {
         const ba = ng() * Math.PI * 2;
@@ -226,7 +347,6 @@ export function mountForest(container) {
     const mat = [foliage1, foliage2, foliage3][Math.floor(rng() * 3)];
     makeTree(side * xOff, z, h, rad, mat);
   }
-
   for (let i = 0; i < 35; i++) {
     makeTree(
       (rng() - 0.5) * 40,
@@ -254,8 +374,8 @@ export function mountForest(container) {
 
   const logMat = new THREE.MeshLambertMaterial({ color: 0x0c1008 });
   for (let i = 0; i < 12; i++) {
-    const x = (rng() - 0.5) * 16;
-    const z = -24 + rng() * 32;
+    const x = (rng() - 0.5) * 16,
+      z = -24 + rng() * 32;
     const log = new THREE.Mesh(
       new THREE.CylinderGeometry(0.09, 0.15, 1.4 + rng() * 2.0, 6),
       logMat,
@@ -290,26 +410,21 @@ export function mountForest(container) {
       i % 3 === 0 ? rockMat2 : rockMat,
     );
   }
-
   for (let i = 0; i < 5; i++) {
     makeRock(-2 + rng() * 4, -14 + rng() * 4, 0.1 + rng() * 0.35, rockMat);
   }
 
-  const dz = -11.5;
+  const dz = DESK_Z;
   const wood = new THREE.MeshLambertMaterial({ color: 0x241408 });
   const woodDark = new THREE.MeshLambertMaterial({ color: 0x16100a });
-
-  function box(w, h, d, mat, x, y, z, rx = 0, ry = 0) {
+  function box(w, h, d, mat, x, y, z) {
     const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
     m.position.set(x, y, z);
-    m.rotation.x = rx;
-    m.rotation.y = ry;
     m.castShadow = true;
     m.receiveShadow = true;
     scene.add(m);
     return m;
   }
-
   box(2.6, 0.07, 1.1, wood, 0, 0.78, dz);
   for (const [lx, lz] of [
     [-1.2, -0.44],
@@ -319,8 +434,30 @@ export function mountForest(container) {
   ]) {
     box(0.07, 0.78, 0.07, woodDark, lx, 0.39, dz + lz);
   }
-  const screenMat = new THREE.MeshBasicMaterial({ color: 0x050c0a });
-  box(0.95, 0.6, 0.04, screenMat, 0, 1.38, dz - 0.2);
+
+  const screenMat = new THREE.MeshBasicMaterial({ color: 0x020505 });
+  const monitorMesh = box(
+    SCREEN_W,
+    SCREEN_H,
+    0.04,
+    screenMat,
+    SCREEN_X,
+    SCREEN_Y,
+    dz - 0.2,
+  );
+
+  const screenGlowMat = new THREE.MeshBasicMaterial({
+    color: 0x003a10,
+    transparent: true,
+    opacity: 0.0,
+  });
+  const screenGlowMesh = new THREE.Mesh(
+    new THREE.BoxGeometry(0.97, 0.62, 0.01),
+    screenGlowMat,
+  );
+  screenGlowMesh.position.set(0, SCREEN_Y, dz - 0.19);
+  scene.add(screenGlowMesh);
+
   box(0.06, 0.15, 0.06, woodDark, 0, 0.95, dz - 0.2);
 
   const deskLight = new THREE.PointLight(0xffcc77, 1.8, 9);
@@ -328,7 +465,6 @@ export function mountForest(container) {
   deskLight.castShadow = true;
   deskLight.shadow.mapSize.set(512, 512);
   scene.add(deskLight);
-
   box(0.04, 0.64, 0.04, woodDark, -0.9, 1.12, dz - 0.28);
   box(0.44, 0.025, 0.04, woodDark, -0.7, 1.44, dz - 0.28);
 
@@ -376,13 +512,12 @@ export function mountForest(container) {
 
   const rayTex = makeGodRayTexture();
   const rays = [];
-
   const rayPositions = [
-    { x: -3, z: -5, ry: 0.3, scale: [1.8, 18, 1], opacity: 0.06 },
-    { x: 1.5, z: -10, ry: -0.15, scale: [1.2, 14, 1], opacity: 0.04 },
-    { x: -5, z: -18, ry: 0.5, scale: [2.2, 20, 1], opacity: 0.05 },
-    { x: 4, z: -22, ry: -0.4, scale: [1.4, 16, 1], opacity: 0.035 },
-    { x: -1, z: 3, ry: 0.1, scale: [1.6, 12, 1], opacity: 0.05 },
+    { x: -3, z: -5, scale: [1.8, 18, 1], opacity: 0.06 },
+    { x: 1.5, z: -10, scale: [1.2, 14, 1], opacity: 0.04 },
+    { x: -5, z: -18, scale: [2.2, 20, 1], opacity: 0.05 },
+    { x: 4, z: -22, scale: [1.4, 16, 1], opacity: 0.035 },
+    { x: -1, z: 3, scale: [1.6, 12, 1], opacity: 0.05 },
   ];
   rayPositions.forEach((rp) => {
     const rayMat = new THREE.SpriteMaterial({
@@ -496,7 +631,6 @@ export function mountForest(container) {
   moonSprite.scale.set(3.8, 3.8, 1);
   moonSprite.position.set(-18, 38, -55);
   scene.add(moonSprite);
-
   const haloTex = makeGlowSprite(0.15);
   const halo = new THREE.Sprite(
     new THREE.SpriteMaterial({
@@ -510,7 +644,6 @@ export function mountForest(container) {
   halo.scale.set(13, 13, 1);
   halo.position.copy(moonSprite.position);
   scene.add(halo);
-
   const moonShaftMat = new THREE.SpriteMaterial({
     map: makeGodRayTexture(),
     transparent: true,
@@ -527,9 +660,9 @@ export function mountForest(container) {
   const starGeo = new THREE.BufferGeometry();
   const starVerts = [];
   for (let i = 0; i < 1400; i++) {
-    const theta = rng() * Math.PI * 2;
-    const phi = Math.acos(2 * rng() - 1);
-    const rad = 95 + rng() * 10;
+    const theta = rng() * Math.PI * 2,
+      phi = Math.acos(2 * rng() - 1),
+      rad = 95 + rng() * 10;
     starVerts.push(
       rad * Math.sin(phi) * Math.cos(theta),
       rad * Math.abs(Math.cos(phi)) + 5,
@@ -572,7 +705,7 @@ export function mountForest(container) {
   }
   document.addEventListener("mousemove", onMouseMove);
   canvas.addEventListener("click", () => {
-    canvas.requestPointerLock();
+    if (!monitorActive) canvas.requestPointerLock();
   });
   exitBtn.addEventListener("click", cleanup);
 
@@ -582,26 +715,102 @@ export function mountForest(container) {
   const clk = new THREE.Clock();
   const SPEED = 3.6;
 
+  let nearMonitor = false;
+
+  function onKeydown(e) {
+    if (e.code === "KeyE" && nearMonitor && !monitorActive) {
+      showMonitor();
+    }
+    if (e.code === "Escape" && monitorActive) {
+      hideMonitor();
+    }
+  }
+  window.addEventListener("keydown", onKeydown);
+
+  const screenCorners3D = [
+    new THREE.Vector3(-SCREEN_W / 2, SCREEN_H / 2, 0.021),
+    new THREE.Vector3(SCREEN_W / 2, SCREEN_H / 2, 0.021),
+    new THREE.Vector3(SCREEN_W / 2, -SCREEN_H / 2, 0.021),
+    new THREE.Vector3(-SCREEN_W / 2, -SCREEN_H / 2, 0.021),
+  ];
+
+  const _v = new THREE.Vector3();
+  const _proj = new THREE.Vector3();
+
+  function projectCorner(localCorner) {
+    _v.copy(localCorner);
+    monitorMesh.localToWorld(_v);
+
+    _proj.copy(_v).project(cam);
+
+    return [
+      (_proj.x * 0.5 + 0.5) * window.innerWidth,
+      (-_proj.y * 0.5 + 0.5) * window.innerHeight,
+    ];
+  }
+
+  function updateIframeTransform() {
+    const pts = screenCorners3D.map((c) => projectCorner(c));
+
+    const xs = pts.map((p) => p[0]);
+    const ys = pts.map((p) => p[1]);
+    const minX = Math.min(...xs),
+      maxX = Math.max(...xs);
+    const minY = Math.min(...ys),
+      maxY = Math.max(...ys);
+    const bw = maxX - minX,
+      bh = maxY - minY;
+
+    iframeWrap.style.left = minX + "px";
+    iframeWrap.style.top = minY + "px";
+    iframeWrap.style.width = bw + "px";
+    iframeWrap.style.height = bh + "px";
+    iframeWrap.style.overflow = "visible";
+
+    const relPts = pts.map((p) => [p[0] - minX, p[1] - minY]);
+
+    const m = computeMatrix3d(relPts, IFRAME_W, IFRAME_H);
+    iframe.style.transform = `matrix3d(${m.join(",")})`;
+  }
+
   let raf;
   function tick() {
     raf = requestAnimationFrame(tick);
     const dt = Math.min(clk.getDelta(), 0.05);
     const t = clk.getElapsedTime();
 
-    euler.set(pitch, yaw, 0, "YXZ");
-    cam.quaternion.setFromEuler(euler);
-    moveDir.set(0, 0, 0);
-    if (keys["KeyW"] || keys["ArrowUp"]) moveDir.z -= 1;
-    if (keys["KeyS"] || keys["ArrowDown"]) moveDir.z += 1;
-    if (keys["KeyA"] || keys["ArrowLeft"]) moveDir.x -= 1;
-    if (keys["KeyD"] || keys["ArrowRight"]) moveDir.x += 1;
-    if (moveDir.lengthSq() > 0)
-      moveDir.normalize().applyEuler(new THREE.Euler(0, yaw, 0));
-    vel.lerp(moveDir.multiplyScalar(SPEED), 0.14);
-    cam.position.addScaledVector(vel, dt);
-    cam.position.x = Math.max(-7, Math.min(7, cam.position.x));
-    cam.position.z = Math.max(-28, Math.min(16, cam.position.z));
-    cam.position.y = 1.72;
+    if (!monitorActive) {
+      euler.set(pitch, yaw, 0, "YXZ");
+      cam.quaternion.setFromEuler(euler);
+      moveDir.set(0, 0, 0);
+      if (keys["KeyW"] || keys["ArrowUp"]) moveDir.z -= 1;
+      if (keys["KeyS"] || keys["ArrowDown"]) moveDir.z += 1;
+      if (keys["KeyA"] || keys["ArrowLeft"]) moveDir.x -= 1;
+      if (keys["KeyD"] || keys["ArrowRight"]) moveDir.x += 1;
+      if (moveDir.lengthSq() > 0)
+        moveDir.normalize().applyEuler(new THREE.Euler(0, yaw, 0));
+      vel.lerp(moveDir.multiplyScalar(SPEED), 0.14);
+      cam.position.addScaledVector(vel, dt);
+      cam.position.x = Math.max(-7, Math.min(7, cam.position.x));
+      cam.position.z = Math.max(-28, Math.min(16, cam.position.z));
+      cam.position.y = 1.72;
+    }
+
+    const ddx = cam.position.x - DESK_X;
+    const ddz = cam.position.z - DESK_Z;
+    const dist = Math.sqrt(ddx * ddx + ddz * ddz);
+    const wasNear = nearMonitor;
+    nearMonitor = dist < MONITOR_INTERACT_DIST && !monitorActive;
+    if (nearMonitor !== wasNear) {
+      monitorHint.style.color = nearMonitor
+        ? "rgba(160,210,140,0.75)"
+        : "rgba(160,210,140,0.0)";
+      screenGlowMat.opacity = nearMonitor ? 0.18 : 0.0;
+    }
+
+    if (monitorActive) {
+      updateIframeTransform();
+    }
 
     deskLight.intensity =
       1.6 + Math.sin(t * 7.1) * 0.07 + Math.sin(t * 17.3) * 0.025;
@@ -632,14 +841,13 @@ export function mountForest(container) {
         ray.userData.baseOpacity *
         (0.85 + Math.sin(t * 0.4 + ray.userData.phase) * 0.15);
     });
-
     moonShaft.material.opacity = 0.07 + Math.sin(t * 0.25) * 0.02;
 
-    const mistPositions = mistGeo.attributes.position.array;
+    const mp = mistGeo.attributes.position.array;
     for (let i = 0; i < mistCount; i++) {
-      mistPositions[i * 3] += Math.sin(t * 0.15 + mistPhases[i]) * 0.002;
-      mistPositions[i * 3 + 1] += 0.0006;
-      if (mistPositions[i * 3 + 1] > 4.0) mistPositions[i * 3 + 1] = 0;
+      mp[i * 3] += Math.sin(t * 0.15 + mistPhases[i]) * 0.002;
+      mp[i * 3 + 1] += 0.0006;
+      if (mp[i * 3 + 1] > 4.0) mp[i * 3 + 1] = 0;
     }
     mistGeo.attributes.position.needsUpdate = true;
     mistMat.opacity = 0.03 + Math.sin(t * 0.2) * 0.01;
@@ -654,9 +862,7 @@ export function mountForest(container) {
     });
 
     groundGlow.intensity = 1.6 + Math.sin(t * 0.3) * 0.3;
-
     stars.rotation.y = t * 0.0008;
-
     r.render(scene, cam);
   }
   tick();
@@ -672,7 +878,9 @@ export function mountForest(container) {
     cancelAnimationFrame(raf);
     window.removeEventListener("keydown", onKey);
     window.removeEventListener("keyup", onKey);
+    window.removeEventListener("keydown", onKeydown);
     window.removeEventListener("resize", onResize);
+    window.removeEventListener("message", onIframeMessage);
     document.removeEventListener("mousemove", onMouseMove);
     document.removeEventListener("pointerlockchange", onPLC);
     if (document.pointerLockElement === canvas) document.exitPointerLock();
@@ -680,6 +888,82 @@ export function mountForest(container) {
   }
 
   return cleanup;
+}
+
+function getLoginSrcdoc() {
+  return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8"/>
+<link rel="stylesheet" href="https://unpkg.com/98.css"/>
+<style>
+  body { margin:0; background:#008080; display:flex; align-items:center; justify-content:center; height:100vh; font-family:sans-serif; }
+  .window { width:280px; }
+  p { font-size:11px; margin:0 0 12px; }
+  #status { font-size:11px; min-height:16px; margin-bottom:8px; color:maroon; }
+</style>
+</head>
+<body>
+<div class="window">
+  <div class="title-bar">
+    <div class="title-bar-text">Log On to iyrs</div>
+    <div class="title-bar-controls">
+      <button aria-label="Close" id="btn-cancel-title"></button>
+    </div>
+  </div>
+  <div class="window-body" style="padding:14px;">
+    <p>Enter your username and password.</p>
+    <div class="field-row-stacked" style="margin-bottom:8px;">
+      <label for="u">Username</label>
+      <input id="u" type="text" autocomplete="off" spellcheck="false"/>
+    </div>
+    <div class="field-row-stacked" style="margin-bottom:10px;">
+      <label for="p">Password</label>
+      <input id="p" type="password" autocomplete="off"/>
+    </div>
+    <div id="status"></div>
+    <div class="field-row" style="justify-content:flex-end;gap:6px;">
+      <button id="btn-ok">OK</button>
+      <button id="btn-cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+<script>
+const USERS = [
+  {user:"vanillyn",pass:"temporal"},
+  {user:"hazellyn",pass:"azimuth"},
+  {user:"moth",pass:"nightjar"},
+];
+const u = document.getElementById("u");
+const p = document.getElementById("p");
+const status = document.getElementById("status");
+let locked = false;
+function attempt() {
+  if (locked) return;
+  const match = USERS.find(v => v.user === u.value.trim().toLowerCase() && v.pass === p.value);
+  if (match) {
+    locked = true;
+    status.style.color = "green";
+    status.textContent = "loading...";
+    setTimeout(() => window.parent.postMessage("login:success", "*"), 700);
+  } else {
+    status.style.color = "maroon";
+    status.textContent = "incorrect username or password.";
+    p.value = "";
+    p.focus();
+    setTimeout(() => { status.textContent = ""; }, 2200);
+  }
+}
+function cancel() { window.parent.postMessage("login:cancel", "*"); }
+document.getElementById("btn-ok").addEventListener("click", attempt);
+document.getElementById("btn-cancel").addEventListener("click", cancel);
+document.getElementById("btn-cancel-title").addEventListener("click", cancel);
+p.addEventListener("keydown", e => { if (e.key === "Enter") attempt(); });
+u.addEventListener("keydown", e => { if (e.key === "Enter") p.focus(); });
+setTimeout(() => u.focus(), 80);
+</script>
+</body>
+</html>`;
 }
 
 function makeProceduralGround(size) {
@@ -691,8 +975,8 @@ function makeProceduralGround(size) {
   const rng = mulberry32(1);
   for (let i = 0; i < 4000; i++) {
     const x = rng() * size,
-      y = rng() * size;
-    const g = Math.floor(8 + rng() * 14);
+      y = rng() * size,
+      g = Math.floor(8 + rng() * 14);
     ctx.fillStyle = `rgb(${g},${Math.floor(g * 1.6)},${g})`;
     ctx.fillRect(x, y, 1 + Math.floor(rng() * 2), 1 + Math.floor(rng() * 2));
   }
@@ -713,7 +997,6 @@ function makeProceduralGround(size) {
   tex.repeat.set(10, 14);
   return tex;
 }
-
 function makeProceduralPath(size) {
   const cv = document.createElement("canvas");
   cv.width = cv.height = size;
@@ -723,8 +1006,8 @@ function makeProceduralPath(size) {
   const rng = mulberry32(2);
   for (let i = 0; i < 2500; i++) {
     const x = rng() * size,
-      y = rng() * size;
-    const v = Math.floor(18 + rng() * 20);
+      y = rng() * size,
+      v = Math.floor(18 + rng() * 20);
     ctx.fillStyle = `rgb(${v},${Math.floor(v * 0.7)},${Math.floor(v * 0.5)})`;
     ctx.fillRect(x, y, 1 + Math.floor(rng() * 2), 1);
   }
@@ -733,7 +1016,6 @@ function makeProceduralPath(size) {
   tex.repeat.set(1, 14);
   return tex;
 }
-
 function makeProceduralBark(size) {
   const cv = document.createElement("canvas");
   cv.width = cv.height = size;
@@ -741,12 +1023,11 @@ function makeProceduralBark(size) {
   ctx.fillStyle = "#0d0d0a";
   ctx.fillRect(0, 0, size, size);
   const rng = mulberry32(9);
-
   for (let x = 0; x < size; x += 2 + Math.floor(rng() * 4)) {
-    const lightness = Math.floor(10 + rng() * 20);
-    const h = 8 + Math.floor(rng() * (size - 8));
-    const y = Math.floor(rng() * (size - h));
-    ctx.fillStyle = `rgb(${lightness},${Math.floor(lightness * 0.9)},${Math.floor(lightness * 0.7)})`;
+    const l = Math.floor(10 + rng() * 20),
+      h = 8 + Math.floor(rng() * (size - 8)),
+      y = Math.floor(rng() * (size - h));
+    ctx.fillStyle = `rgb(${l},${Math.floor(l * 0.9)},${Math.floor(l * 0.7)})`;
     ctx.fillRect(x, y, 1 + Math.floor(rng() * 2), h);
   }
   const tex = new THREE.CanvasTexture(cv);
@@ -754,7 +1035,6 @@ function makeProceduralBark(size) {
   tex.repeat.set(2, 4);
   return tex;
 }
-
 function makeGlowSprite(innerStop = 0.0) {
   const cv = document.createElement("canvas");
   cv.width = cv.height = 64;
@@ -767,7 +1047,6 @@ function makeGlowSprite(innerStop = 0.0) {
   ctx.fillRect(0, 0, 64, 64);
   return new THREE.CanvasTexture(cv);
 }
-
 function makeGodRayTexture() {
   const cv = document.createElement("canvas");
   cv.width = 32;
@@ -788,7 +1067,6 @@ function makeGodRayTexture() {
   ctx.fillRect(0, 0, 32, 128);
   return new THREE.CanvasTexture(cv);
 }
-
 function makeMoonTex() {
   const cv = document.createElement("canvas");
   cv.width = cv.height = 128;
@@ -813,7 +1091,6 @@ function makeMoonTex() {
   ctx.globalAlpha = 1;
   return new THREE.CanvasTexture(cv);
 }
-
 function mulberry32(seed) {
   return function () {
     seed |= 0;
