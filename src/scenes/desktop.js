@@ -5,7 +5,7 @@ const DATA_ENTRIES = [
   {
     label: "about me",
     content:
-      "im vanillyn. i sorta just behave how people like me too. i prioritize being likable over anything else, which is ironic considering how many people dislike me. this includes not really having a gender or sexuality. i am whatever you see me as.",
+      'im vanillyn. i sorta just behave how people like me too. i prioritize being likable over anything else, which is ironic considering how many people dislike me. this includes not really having a gender or sexuality. i am whatever you see me as. id say im good with programming and troubleshooting. i really love computers and really love helping people with it. anything with computers, really. i wish i could say "i do this specific thing and asking me to do anything else wont work" but really i do everything. i dont have many friends, if at all. i wish to be able to talk to people more often in private, because i miss being able to be myself, but i guess people dont want myself. its fine either way. thanks for checking out my website btw. i dont do anything right now, but i promise there will be cool projects.',
   },
   { label: "current version", content: "website version 1.6" },
   {
@@ -323,7 +323,7 @@ export function mountDesktop(container) {
       label: "shut down...",
       action: () => {
         document.body.innerHTML =
-          "<p style='font-family:monospace;padding:20px;color:#fff;background:#000;'>it is now safe to turn off your computer.</p>";
+          "<p style='font-family:monospace;padding:20px;color:#fff;background:#000;'>it is now safe to go to sleep.</p>";
       },
     },
   ];
