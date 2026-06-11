@@ -108,3 +108,28 @@ function getTouchDist(touches) {
   const dy = touches[0].clientY - touches[1].clientY;
   return Math.sqrt(dx * dx + dy * dy);
 }
+
+export function desktopWarning(container, sceneName = "this scene") {
+  const isMobile =
+    /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ||
+    window.innerWidth < 600;
+  if (!isMobile) return false;
+
+  const el = document.createElement("div");
+  el.style.cssText = `
+    position:absolute;inset:0;
+    background:#050505;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    font-family:'Geist Mono',monospace;color:#888;
+    text-align:center;padding:40px;gap:20px;
+  `;
+  el.innerHTML = `
+    <div style="font-size:32px;">🖥️</div>
+    <div style="font-size:12px;letter-spacing:3px;text-transform:uppercase;color:#ccc;">desktop only</div>
+    <div style="font-size:10px;color:#555;letter-spacing:1px;max-width:260px;line-height:1.9;">
+      ${sceneName} requires a keyboard and mouse.<br>open on a larger screen.
+    </div>
+  `;
+  container.appendChild(el);
+  return true;
+}

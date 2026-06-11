@@ -1,5 +1,5 @@
 import { launchScene, closeScene } from "../scene.js";
-
+import { desktopWarning } from "../mobile.js";
 const DESK_Z = -11.5;
 const DESK_X = 0;
 const MONITOR_INTERACT_DIST = 2.2;
@@ -71,6 +71,7 @@ function computeMatrix3d(corners, w, h) {
 }
 
 export function mountForest(container) {
+  if (desktopWarning(container, "forest")) return () => {};
   const canvas = document.createElement("canvas");
   canvas.style.cssText =
     "position:absolute;inset:0;width:100%;height:100%;display:block;";

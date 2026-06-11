@@ -13,6 +13,7 @@ import {
   anotherChance,
   startHoverGlitch,
   cancelHoverGlitch,
+  isSceneActive,
 } from "./src/scene.js";
 import {
   materials,
@@ -51,6 +52,7 @@ import {
   hubServices,
   returnNode,
   dataNode,
+  settingsNode,
   activateMe,
   activateFriends,
   activateServices,
@@ -59,6 +61,7 @@ import {
   showdataPopup,
   openSubMenu,
   closeSubMenu,
+  openSettingsDialog,
 } from "./src/nav.js";
 import {
   drawPost,
@@ -68,7 +71,6 @@ import {
   hideTooltip,
   labelPos,
 } from "./src/ui.js";
-
 import { initMobile } from "./src/mobile.js";
 import { initPaintTex, paintAt } from "./src/paint.js";
 import {
@@ -79,6 +81,7 @@ import {
   setBlurVelocity,
   setChromaticStrength,
 } from "./src/post.js";
+import { settings, onSettingsChange } from "./src/settings.js";
 
 window.launchScene = launchScene;
 initScene();
@@ -93,18 +96,15 @@ scene.add(artifactGroup);
 initNav(artifactGroup);
 
 const postReady = initPost(renderer, scene, camera);
-
 if (postReady) {
   setPostChromatic(false, 0.0);
   setPostMotionBlur(false, 0.0);
 }
 
 const randomdonut = Math.random() < 0.08;
-if (randomdonut) {
+if (randomdonut)
   spawnFallback(() => new THREE.TorusGeometry(1.0, 0.38, 64, 128));
-} else {
-  loadStartupModel();
-}
+else loadStartupModel();
 
 if (anotherChance) {
   const ns = document.getElementById("name-span");
@@ -116,8 +116,8 @@ function restoreModel() {
   if (mg.children.length === 0) loadStartupModel();
 }
 
-let isLight = false;
-let lightTween = 0;
+let isLight = false,
+  lightTween = 0;
 
 function applyTheme(light) {
   isLight = light;
@@ -131,17 +131,29 @@ document.getElementById("ctx-theme")?.addEventListener("click", () => {
   applyTheme(!isLight);
 });
 
-let previewRenderer = null;
-let previewScene = null;
-let previewCamera = null;
+let BASE_FOV = settings.fov;
+onSettingsChange((key, val) => {
+  if (key === "fov") {
+    BASE_FOV = val;
+    camera.fov = val;
+    camera.updateProjectionMatrix();
+  }
+});
+
+function menuIsActive() {
+  return !isSceneActive();
+}
+
+let previewRenderer = null,
+  previewScene = null,
+  previewCamera = null;
 const previewGeo = new THREE.IcosahedronGeometry(0.8, 1);
 const previewMesh = new THREE.Mesh(previewGeo, materials[0]);
 
 function initPreviewRenderer() {
   if (previewRenderer) return;
   const canvas = document.createElement("canvas");
-  canvas.width = 80;
-  canvas.height = 80;
+  canvas.width = canvas.height = 80;
   previewRenderer = new THREE.WebGLRenderer({
     canvas,
     antialias: true,
@@ -175,9 +187,8 @@ let camZoom = 10,
   camTX = 0,
   camTY = 0;
 let hoverTarget = 0;
-const BASE_FOV = 45;
-let hoverTimer = null;
-let isHoveringModel = false;
+let hoverTimer = null,
+  isHoveringModel = false;
 let prevRotY = 0,
   prevRotX = 0;
 let flashEl = null;
@@ -213,10 +224,12 @@ function syncPostEffects() {
 
 document.getElementById("name-span").addEventListener("click", (e) => {
   e.stopPropagation();
+  if (!menuIsActive()) return;
   cycleMat(doApplyMat);
 });
 document.getElementById("shader-sub").addEventListener("click", (e) => {
   e.stopPropagation();
+  if (!menuIsActive()) return;
   cycleMat(doApplyMat);
 });
 
@@ -231,7 +244,6 @@ function buildShaderGrid() {
     const cell = document.createElement("div");
     cell.className = "shader-grid-cell";
     cell.setAttribute("data-idx", idx);
-
     try {
       const img = document.createElement("img");
       img.className = "shader-grid-preview";
@@ -242,14 +254,12 @@ function buildShaderGrid() {
       cell.style.overflow = "hidden";
       cell.appendChild(img);
     } catch (e) {}
-
     const label = document.createElement("span");
     label.className = "shader-grid-label";
     label.textContent = name;
     label.style.position = "relative";
     label.style.zIndex = "1";
     cell.appendChild(label);
-
     cell.addEventListener("click", () => {
       ctxMenu.style.display = "none";
       setMatByIdx(idx, doApplyMat);
@@ -261,6 +271,7 @@ function buildShaderGrid() {
 document.getElementById("name-span").addEventListener("contextmenu", (e) => {
   e.preventDefault();
   e.stopPropagation();
+  if (!menuIsActive()) return;
   buildShaderGrid();
   ctxMenu.style.cssText = `display:block;left:${e.clientX}px;top:${e.clientY}px`;
   updateSub();
@@ -292,15 +303,11 @@ const meshHandlers = {
       "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/CesiumMilkTruck/glTF/CesiumMilkTruck.gltf",
     ),
 };
-
 Object.entries(meshHandlers).forEach(([id, handler]) => {
-  const element = document.getElementById(id);
-  if (element) {
-    element.addEventListener("click", () => {
-      ctxMenu.style.display = "none";
-      handler();
-    });
-  }
+  document.getElementById(id)?.addEventListener("click", () => {
+    ctxMenu.style.display = "none";
+    handler();
+  });
 });
 
 document.getElementById("ctx-upload-model").addEventListener("click", () => {
@@ -311,7 +318,6 @@ document.getElementById("ctx-upload-shader").addEventListener("click", () => {
   ctxMenu.style.display = "none";
   document.getElementById("shader-upload").click();
 });
-
 document.getElementById("model-upload").addEventListener("change", (e) => {
   if (e.target.files[0]) loadGLTF(URL.createObjectURL(e.target.files[0]));
 });
@@ -341,11 +347,7 @@ function flashAndReload() {
   if (flashEl) return;
   const hue = Math.floor(Math.random() * 360);
   flashEl = document.createElement("div");
-  flashEl.style.cssText = `
-    position:fixed;inset:0;z-index:9999;pointer-events:none;
-    background:hsl(${hue},80%,60%);opacity:0;
-    transition:opacity 0.06s ease;
-  `;
+  flashEl.style.cssText = `position:fixed;inset:0;z-index:9999;pointer-events:none;background:hsl(${hue},80%,60%);opacity:0;transition:opacity 0.06s ease;`;
   document.body.appendChild(flashEl);
   requestAnimationFrame(() => {
     flashEl.style.opacity = "1";
@@ -371,13 +373,18 @@ function isExcluded(e) {
   );
 }
 
-document.addEventListener("mousedown", (e) =>
-  startHold(e, isExcluded, openIyrs),
-);
-document.addEventListener("mouseup", cancelHold);
+document.addEventListener("mousedown", (e) => {
+  if (!menuIsActive()) return;
+  startHold(e, isExcluded, openIyrs);
+});
+document.addEventListener("mouseup", () => {
+  if (!menuIsActive()) return;
+  cancelHold();
+});
 document.addEventListener("mouseleave", cancelHold);
 
 document.addEventListener("mousemove", (e) => {
+  if (!menuIsActive()) return;
   mouseX = e.clientX - innerWidth / 2;
   mouseY = e.clientY - innerHeight / 2;
   mouse.x = (e.clientX / innerWidth) * 2 - 1;
@@ -392,7 +399,6 @@ document.addEventListener("mousemove", (e) => {
     camTX = mousePosNX * 0.5;
     camTY = mousePosNY * 0.5;
   }
-
   if (getMatIdx() === 13 && !getCustomMat()) {
     raycaster.setFromCamera(mouse, camera);
     const hits = raycaster.intersectObjects(getModelGroup().children, true);
@@ -403,6 +409,7 @@ document.addEventListener("mousemove", (e) => {
 document.addEventListener(
   "wheel",
   (e) => {
+    if (!menuIsActive()) return;
     if (isIyrsOpen()) return;
     e.preventDefault();
     camZoom = Math.max(4, Math.min(20, camZoom + e.deltaY * 0.015));
@@ -411,6 +418,7 @@ document.addEventListener(
 );
 
 function handleClick(raycaster) {
+  if (!menuIsActive()) return;
   if (isIyrsOpen()) return;
   const li = raycaster.intersectObjects(clickables);
   const mi = raycaster.intersectObjects(getModelGroup().children, true);
@@ -425,9 +433,8 @@ function handleClick(raycaster) {
       return;
     }
     if (returnNode && obj === returnNode.mesh) {
-      if (obj.userData.isReturnToData) {
-        closeSubMenu();
-      } else {
+      if (obj.userData.isReturnToData) closeSubMenu();
+      else {
         closeSubMenu();
         activateMe(restoreModel);
       }
@@ -439,12 +446,14 @@ function handleClick(raycaster) {
       activatedataMenu(artifactGroup);
       return;
     }
-
+    if (settingsNode && obj === settingsNode.mesh) {
+      openSettingsDialog();
+      return;
+    }
     if (obj.userData.isSubMenuHub) {
       openSubMenu(obj.userData.subEntries);
       return;
     }
-
     if (obj.userData.isDataEntry && obj.userData.popup) {
       showdataPopup(obj.userData.popup);
       return;
@@ -465,6 +474,7 @@ initMobile({
   mouse,
   bgMat,
   onTap: ({ clientX, clientY }) => {
+    if (!menuIsActive()) return;
     if (isIyrsOpen()) return;
     mouse.x = (clientX / innerWidth) * 2 - 1;
     mouse.y = -((clientY / innerHeight) * 2 - 1);
@@ -472,13 +482,14 @@ initMobile({
     handleClick(raycaster);
   },
   onHoldStart: () => {
-    if (!isIyrsOpen()) openIyrs();
+    if (menuIsActive() && !isIyrsOpen()) openIyrs();
   },
   onHoldEnd: cancelHold,
   onPinch: (delta) => {
-    camZoom = Math.max(4, Math.min(20, camZoom + delta));
+    if (menuIsActive()) camZoom = Math.max(4, Math.min(20, camZoom + delta));
   },
   onDrag: (dx, dy) => {
+    if (!menuIsActive()) return;
     artifactGroup.rotation.y += dx * 0.005;
     artifactGroup.rotation.x += dy * 0.005;
     mouseX = dx * 0.5;
@@ -514,43 +525,36 @@ function animate() {
   const rotVelY = artifactGroup.rotation.y - prevRotY;
   const rotVelX = artifactGroup.rotation.x - prevRotX;
   const totalVel = Math.abs(rotVelY) + Math.abs(rotVelX);
-
   if (motionBlurMat.uniforms?.uVelocity)
     motionBlurMat.uniforms.uVelocity.value.set(rotVelY * 10, rotVelX * 10, 0);
 
   if (postReady) {
     const mat = curMat();
-    const isMotionBlurShader = !getCustomMat() && mat === motionBlurMat;
-    const isChromaticShader = !getCustomMat() && mat === chromaticMat;
-
-    if (isMotionBlurShader) {
-      setBlurVelocity(totalVel);
-    }
-    if (isChromaticShader) {
+    if (!getCustomMat() && mat === motionBlurMat) setBlurVelocity(totalVel);
+    if (!getCustomMat() && mat === chromaticMat)
       setChromaticStrength(1.8 + Math.sin(t * 0.4) * 0.4);
-    }
   }
-
   prevRotY = artifactGroup.rotation.y;
   prevRotX = artifactGroup.rotation.x;
 
   tickOpacity();
 
-  if (!isIyrsOpen()) {
-    camera.position.x += (camTX - camera.position.x) * 0.04;
-    camera.position.y += (camTY - camera.position.y) * 0.04;
-    camZoomActual += (camZoom - camZoomActual) * 0.08;
-    camera.position.z = camZoomActual;
-    const d = Math.sqrt(mousePosNX * mousePosNX + mousePosNY * mousePosNY);
-    camera.fov += (BASE_FOV + d * 12 - camera.fov) * 0.06;
-    camera.updateProjectionMatrix();
+  if (menuIsActive()) {
+    if (!isIyrsOpen()) {
+      camera.position.x += (camTX - camera.position.x) * 0.04;
+      camera.position.y += (camTY - camera.position.y) * 0.04;
+      camZoomActual += (camZoom - camZoomActual) * 0.08;
+      camera.position.z = camZoomActual;
+      const d = Math.sqrt(mousePosNX * mousePosNX + mousePosNY * mousePosNY);
+      camera.fov += (BASE_FOV + d * 12 - camera.fov) * 0.06;
+      camera.updateProjectionMatrix();
+    }
+    artifactGroup.rotation.y +=
+      0.05 * (mouseX * 0.001 - artifactGroup.rotation.y);
+    artifactGroup.rotation.x +=
+      0.05 * (mouseY * 0.001 - artifactGroup.rotation.x);
+    artifactGroup.rotation.z += 0.001;
   }
-
-  artifactGroup.rotation.y +=
-    0.05 * (mouseX * 0.001 - artifactGroup.rotation.y);
-  artifactGroup.rotation.x +=
-    0.05 * (mouseY * 0.001 - artifactGroup.rotation.x);
-  artifactGroup.rotation.z += 0.001;
 
   if (dataNode?.mesh) {
     dataNode.mesh.rotation.y += 0.02;
@@ -559,21 +563,30 @@ function animate() {
     if (dataNode.mat?.uniforms?.uOpacity)
       dataNode.mat.uniforms.uOpacity.value = 0.5 + pulse * 0.4;
   }
+  if (settingsNode?.mesh) {
+    settingsNode.mesh.rotation.y += 0.018;
+    settingsNode.mesh.rotation.x -= 0.01;
+    const pulse = Math.sin(t * 2.5 + 1) * 0.5 + 0.5;
+    if (settingsNode.mat?.uniforms?.uOpacity)
+      settingsNode.mat.uniforms.uOpacity.value = 0.5 + pulse * 0.4;
+  }
 
   raycaster.setFromCamera(mouse, camera);
-  const li = raycaster.intersectObjects(clickables);
-  const mi = raycaster.intersectObjects(getModelGroup().children, true);
+  const li = menuIsActive() ? raycaster.intersectObjects(clickables) : [];
+  const mi = menuIsActive()
+    ? raycaster.intersectObjects(getModelGroup().children, true)
+    : [];
 
   let hovNode = null;
-  if (!isIyrsOpen()) {
+  if (menuIsActive() && !isIyrsOpen()) {
     if (li.length) {
       document.body.style.cursor = "pointer";
       hovNode = li[0].object;
       const ud = hovNode.userData;
       if (ud.isDataNode) showTooltip("data");
+      else if (ud.isSettingsNode) showTooltip("settings");
       else if (ud.isDataEntry) showTooltip(ud.label);
       else showTooltip(ud.isHub || ud.isReturn ? ud.label : `url: ${ud.url}`);
-
       if (isHoveringModel) {
         clearTimeout(hoverTimer);
         isHoveringModel = false;
@@ -586,7 +599,6 @@ function animate() {
       hoverU.uHoverPos.value.copy(
         getModelGroup().worldToLocal(mi[0].point.clone()),
       );
-
       if (!isHoveringModel) {
         isHoveringModel = true;
         hoverTimer = setTimeout(() => {
@@ -597,31 +609,31 @@ function animate() {
       document.body.style.cursor = "default";
       hideTooltip();
       hoverTarget = 0;
-
       if (isHoveringModel) {
         clearTimeout(hoverTimer);
         isHoveringModel = false;
       }
     }
+  } else {
+    document.body.style.cursor = "default";
   }
 
   hoverU.uHoverStrength.value +=
     (hoverTarget - hoverU.uHoverStrength.value) * 0.06;
-  labelEls.forEach((item) =>
-    labelPos(
-      item.mesh,
-      item.el,
-      item.mesh === hovNode,
-      camera,
-      getModelGroup(),
-    ),
-  );
-
-  if (postReady) {
-    renderPost(renderer, scene, camera);
-  } else {
-    renderer.render(scene, camera);
+  if (menuIsActive()) {
+    labelEls.forEach((item) =>
+      labelPos(
+        item.mesh,
+        item.el,
+        item.mesh === hovNode,
+        camera,
+        getModelGroup(),
+      ),
+    );
   }
+
+  if (postReady) renderPost(renderer, scene, camera);
+  else renderer.render(scene, camera);
 
   drawPost(mousePosNX, mousePosNY);
 }

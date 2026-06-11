@@ -1,5 +1,6 @@
 import { makeLineMat } from "./materials.js";
 import { launchScene } from "./scene.js";
+import { settings, setSetting, onSettingsChange } from "./settings.js";
 
 export const LINKS_ME = [
   { label: "neo-polita", url: "https://discord.gg/2KVRMDHCnN", icon: "🌐" },
@@ -18,6 +19,7 @@ const HUB_FRIENDS_COLOR = "#3af";
 const HUB_SERVICES_COLOR = "#3f9";
 const RETURN_COLOR = "#f44";
 const DATA_NODE_COLOR = "#ffdd00";
+const SETTINGS_NODE_COLOR = "#c8aaff";
 
 const DATA_ENTRIES = [
   {
@@ -53,10 +55,7 @@ const DATA_ENTRIES = [
         'this website is sorta just a culmination of me having made websites for a while, i just dont want to have a "normal" ui and just choose to do this.',
     },
   },
-  {
-    label: "scene test",
-    popup: { type: "script", sceneId: "cube" },
-  },
+  { label: "scene test", popup: { type: "script", sceneId: "cube" } },
   {
     label: "submenu test",
     submenu: [
@@ -96,16 +95,82 @@ export let labelEls = [];
 export let activeLayer = "me";
 export let hubFriends, hubServices, returnNode;
 export let dataNode = null;
+export let settingsNode = null;
 
 let _artifactGroup = null;
-let dataMenuMeshes = [];
-let dataMenuEls = [];
-let dataMenuMats = [];
-
+let dataMenuMeshes = [],
+  dataMenuEls = [],
+  dataMenuMats = [];
 let subMenuStack = [];
-let isInSubMenu = false;
-
 const opacityTweens = new Map();
+
+let settingsDialog = null;
+
+function buildSettingsDialog() {
+  if (settingsDialog) {
+    settingsDialog.style.display = "block";
+    return;
+  }
+  const el = document.createElement("div");
+  el.style.cssText = `
+    position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+    background:rgba(5,5,8,0.97);border:1px solid ${SETTINGS_NODE_COLOR};
+    color:${SETTINGS_NODE_COLOR};font-family:'Geist Mono',monospace;font-size:12px;
+    padding:26px 32px;width:340px;max-width:90vw;
+    letter-spacing:1px;line-height:2;z-index:500;pointer-events:auto;
+  `;
+
+  function row(label, inputHtml) {
+    return `<div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(200,170,255,0.1);padding:6px 0;">
+      <span style="font-size:10px;color:#9a8acc;">${label}</span>${inputHtml}
+    </div>`;
+  }
+
+  el.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
+      <span style="font-size:9px;letter-spacing:3px;text-transform:uppercase;">settings</span>
+      <span id="settings-close" style="cursor:pointer;opacity:0.4;font-size:16px;">✕</span>
+    </div>
+    ${row(
+      "fov",
+      `<div style="display:flex;align-items:center;gap:8px;">
+      <input id="s-fov" type="range" min="30" max="100" value="${settings.fov}" style="width:110px;accent-color:${SETTINGS_NODE_COLOR};">
+      <span id="s-fov-val" style="width:28px;text-align:right;font-size:11px;">${settings.fov}</span>
+    </div>`,
+    )}
+    ${row(
+      "sensitivity",
+      `<div style="display:flex;align-items:center;gap:8px;">
+      <input id="s-sens" type="range" min="20" max="200" value="${Math.round(settings.mouseSensitivity * 100)}" style="width:110px;accent-color:${SETTINGS_NODE_COLOR};">
+      <span id="s-sens-val" style="width:28px;text-align:right;font-size:11px;">${settings.mouseSensitivity.toFixed(1)}</span>
+    </div>`,
+    )}
+    <div style="margin-top:18px;font-size:9px;color:#5a4a8a;letter-spacing:1px;">changes apply immediately</div>
+  `;
+
+  document.body.appendChild(el);
+  settingsDialog = el;
+
+  el.querySelector("#settings-close").addEventListener("click", () => {
+    el.style.display = "none";
+  });
+
+  const fovSlider = el.querySelector("#s-fov");
+  const fovVal = el.querySelector("#s-fov-val");
+  fovSlider.addEventListener("input", () => {
+    const v = parseInt(fovSlider.value);
+    fovVal.textContent = v;
+    setSetting("fov", v);
+  });
+
+  const sensSlider = el.querySelector("#s-sens");
+  const sensVal = el.querySelector("#s-sens-val");
+  sensSlider.addEventListener("input", () => {
+    const v = parseInt(sensSlider.value) / 100;
+    sensVal.textContent = v.toFixed(1);
+    setSetting("mouseSensitivity", v);
+  });
+}
 
 export function fadeMat(mat, target, speed = 0.04) {
   opacityTweens.set(mat, { target, speed });
@@ -184,27 +249,23 @@ function buildLayer(links, hexColor, group) {
 const popupEl = (() => {
   const el = document.createElement("div");
   el.id = "data-popup";
-  el.style.cssText = `
-    position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+  el.style.cssText = `position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
     background:rgba(5,5,5,0.97);border:1px solid #ffdd00;
     color:#ffdd00;font-family:'Geist Mono',monospace;font-size:13px;
     padding:22px 30px;max-width:480px;width:90vw;text-align:center;
     letter-spacing:1px;line-height:1.7;z-index:500;
-    display:none;pointer-events:auto;max-height:80vh;overflow-y:auto;
-  `;
-
+    display:none;pointer-events:auto;max-height:80vh;overflow-y:auto;`;
   const closeBtn = document.createElement("div");
   closeBtn.textContent = "✕";
-  closeBtn.style.cssText = `position:sticky;top:0;float:right;cursor:pointer;opacity:0.5;font-size:16px;padding:0 0 8px 12px;`;
+  closeBtn.style.cssText =
+    "position:sticky;top:0;float:right;cursor:pointer;opacity:0.5;font-size:16px;padding:0 0 8px 12px;";
   closeBtn.onclick = () => {
     el.style.display = "none";
   };
   el.appendChild(closeBtn);
-
   const body = document.createElement("div");
   body.id = "data-popup-body";
   el.appendChild(body);
-
   document.body.appendChild(el);
   return { el, body };
 })();
@@ -214,9 +275,7 @@ export function showdataPopup(popup) {
     launchScene(popup.sceneId);
     return;
   }
-
   popupEl.body.innerHTML = "";
-
   if (!popup || typeof popup === "string") {
     const t = document.createElement("span");
     t.textContent = popup || "";
@@ -224,7 +283,6 @@ export function showdataPopup(popup) {
     popupEl.el.style.display = "block";
     return;
   }
-
   switch (popup.type) {
     case "text": {
       const t = document.createElement("p");
@@ -239,54 +297,6 @@ export function showdataPopup(popup) {
       img.style.cssText =
         "max-width:100%;border:1px solid #ffdd0066;display:block;margin:0 auto 10px;";
       popupEl.body.appendChild(img);
-      if (popup.caption) {
-        const cap = document.createElement("p");
-        cap.style.cssText = "font-size:10px;opacity:0.6;margin:4px 0 0;";
-        cap.textContent = popup.caption;
-        popupEl.body.appendChild(cap);
-      }
-      break;
-    }
-    case "video": {
-      const vid = document.createElement("video");
-      vid.src = popup.src;
-      vid.controls = true;
-      vid.style.cssText =
-        "max-width:100%;border:1px solid #ffdd0066;display:block;margin:0 auto 10px;";
-      popupEl.body.appendChild(vid);
-      if (popup.caption) {
-        const cap = document.createElement("p");
-        cap.style.cssText = "font-size:10px;opacity:0.6;margin:4px 0 0;";
-        cap.textContent = popup.caption;
-        popupEl.body.appendChild(cap);
-      }
-      break;
-    }
-    case "gallery": {
-      const wrap = document.createElement("div");
-      wrap.style.cssText =
-        "display:flex;flex-wrap:wrap;gap:8px;justify-content:center;";
-      (popup.items || []).forEach((item) => {
-        const fig = document.createElement("figure");
-        fig.style.cssText = "margin:0;flex:1 1 120px;max-width:200px;";
-        const img = document.createElement("img");
-        img.src = item.src;
-        img.style.cssText =
-          "width:100%;border:1px solid #ffdd0044;display:block;cursor:pointer;";
-        img.onclick = () =>
-          showdataPopup({
-            type: "image",
-            src: item.src,
-            caption: item.caption,
-          });
-        const cap = document.createElement("figcaption");
-        cap.style.cssText = "font-size:9px;opacity:0.55;margin-top:3px;";
-        cap.textContent = item.caption || "";
-        fig.appendChild(img);
-        fig.appendChild(cap);
-        wrap.appendChild(fig);
-      });
-      popupEl.body.appendChild(wrap);
       break;
     }
     case "mixed": {
@@ -302,13 +312,6 @@ export function showdataPopup(popup) {
           img.style.cssText =
             "max-width:100%;border:1px solid #ffdd0066;display:block;margin:0 auto 10px;";
           popupEl.body.appendChild(img);
-        } else if (block.type === "video") {
-          const vid = document.createElement("video");
-          vid.src = block.src;
-          vid.controls = true;
-          vid.style.cssText =
-            "max-width:100%;display:block;margin:0 auto 10px;";
-          popupEl.body.appendChild(vid);
         }
       });
       break;
@@ -319,50 +322,7 @@ export function showdataPopup(popup) {
       popupEl.body.appendChild(t);
     }
   }
-
   popupEl.el.style.display = "block";
-}
-
-function buildDataMenu(group) {
-  if (dataMenuMeshes.length) return;
-  DATA_ENTRIES.forEach((entry, i) => {
-    const mat = makeLineMat(DATA_NODE_COLOR, 0);
-    allLayerMats.push(mat);
-    dataMenuMats.push(mat);
-    const angle = (i / DATA_ENTRIES.length) * Math.PI * 2;
-    const r = 2.5;
-    const pos = new THREE.Vector3(
-      Math.cos(angle) * r,
-      Math.sin(angle) * r * 0.7,
-      0.5,
-    );
-    const node = new THREE.Mesh(new THREE.IcosahedronGeometry(0.13, 1), mat);
-    node.position.copy(pos);
-
-    if (entry.submenu) {
-      node.userData = {
-        isDataEntry: true,
-        isSubMenuHub: true,
-        label: entry.label,
-        subEntries: entry.submenu,
-      };
-    } else {
-      node.userData = {
-        isDataEntry: true,
-        label: entry.label,
-        popup: entry.popup,
-      };
-    }
-
-    group.add(node);
-    dataMenuMeshes.push(node);
-    const div = document.createElement("div");
-    div.className = "track-label";
-    div.innerText = entry.label;
-    div.style.color = DATA_NODE_COLOR;
-    labelsContainer.appendChild(div);
-    dataMenuEls.push({ mesh: node, el: div });
-  });
 }
 
 function pushSubMenu(entries, group) {
@@ -373,8 +333,8 @@ function pushSubMenu(entries, group) {
     const mat = makeLineMat(DATA_NODE_COLOR, 0);
     allLayerMats.push(mat);
     mats.push(mat);
-    const angle = (i / entries.length) * Math.PI * 2;
-    const r = 2.0;
+    const angle = (i / entries.length) * Math.PI * 2,
+      r = 2.0;
     const pos = new THREE.Vector3(
       Math.cos(angle) * r,
       Math.sin(angle) * r * 0.7,
@@ -382,22 +342,14 @@ function pushSubMenu(entries, group) {
     );
     const node = new THREE.Mesh(new THREE.IcosahedronGeometry(0.11, 1), mat);
     node.position.copy(pos);
-
-    if (entry.submenu) {
-      node.userData = {
-        isDataEntry: true,
-        isSubMenuHub: true,
-        label: entry.label,
-        subEntries: entry.submenu,
-      };
-    } else {
-      node.userData = {
-        isDataEntry: true,
-        label: entry.label,
-        popup: entry.popup,
-      };
-    }
-
+    node.userData = entry.submenu
+      ? {
+          isDataEntry: true,
+          isSubMenuHub: true,
+          label: entry.label,
+          subEntries: entry.submenu,
+        }
+      : { isDataEntry: true, label: entry.label, popup: entry.popup };
     group.add(node);
     meshes.push(node);
     const div = document.createElement("div");
@@ -410,7 +362,6 @@ function pushSubMenu(entries, group) {
   });
   mats.forEach((m) => fadeMat(m, 1, 0.06));
   subMenuStack.push({ meshes, els, mats, entries });
-  isInSubMenu = true;
 }
 
 function popSubMenuLevel(group) {
@@ -423,13 +374,11 @@ function popSubMenuLevel(group) {
     m.uniforms.uOpacity.value = 0;
     m.visible = false;
   });
-  isInSubMenu = subMenuStack.length > 0;
 }
 
 function clearAllSubMenus(group) {
   while (subMenuStack.length) popSubMenuLevel(group);
 }
-
 function currentSubLevel() {
   return subMenuStack.length ? subMenuStack[subMenuStack.length - 1] : null;
 }
@@ -442,12 +391,8 @@ export function openSubMenu(entries) {
       el.style.opacity = "0";
       el.style.pointerEvents = "none";
     });
-  } else {
-    dataMenuMats.forEach((m) => fadeMat(m, 0, 0.05));
-  }
-
+  } else dataMenuMats.forEach((m) => fadeMat(m, 0, 0.05));
   pushSubMenu(entries, _artifactGroup);
-
   if (returnNode) {
     returnNode.mesh.userData = {
       isReturn: true,
@@ -470,14 +415,11 @@ export function closeSubMenu() {
         el.style.pointerEvents = "";
       });
     }
-
     updateClickables();
     return;
   }
-
   clearAllSubMenus(_artifactGroup);
   dataMenuMats.forEach((m) => fadeMat(m, 1, 0.05));
-
   if (returnNode) {
     returnNode.mesh.userData = {
       isReturn: true,
@@ -487,6 +429,40 @@ export function closeSubMenu() {
     returnNode.el.innerText = "← return";
   }
   updateClickables();
+}
+
+function buildDataMenu(group) {
+  if (dataMenuMeshes.length) return;
+  DATA_ENTRIES.forEach((entry, i) => {
+    const mat = makeLineMat(DATA_NODE_COLOR, 0);
+    allLayerMats.push(mat);
+    dataMenuMats.push(mat);
+    const angle = (i / DATA_ENTRIES.length) * Math.PI * 2,
+      r = 2.5;
+    const pos = new THREE.Vector3(
+      Math.cos(angle) * r,
+      Math.sin(angle) * r * 0.7,
+      0.5,
+    );
+    const node = new THREE.Mesh(new THREE.IcosahedronGeometry(0.13, 1), mat);
+    node.position.copy(pos);
+    node.userData = entry.submenu
+      ? {
+          isDataEntry: true,
+          isSubMenuHub: true,
+          label: entry.label,
+          subEntries: entry.submenu,
+        }
+      : { isDataEntry: true, label: entry.label, popup: entry.popup };
+    group.add(node);
+    dataMenuMeshes.push(node);
+    const div = document.createElement("div");
+    div.className = "track-label";
+    div.innerText = entry.label;
+    div.style.color = DATA_NODE_COLOR;
+    labelsContainer.appendChild(div);
+    dataMenuEls.push({ mesh: node, el: div });
+  });
 }
 
 export function initNav(artifactGroup) {
@@ -540,6 +516,19 @@ export function initNav(artifactGroup) {
   labelsContainer.appendChild(sdiv);
   dataNode = { mesh: snode, el: sdiv, mat: smat };
 
+  const stmat = makeLineMat(SETTINGS_NODE_COLOR, 0.8);
+  allLayerMats.push(stmat);
+  const stnode = new THREE.Mesh(new THREE.OctahedronGeometry(0.12, 0), stmat);
+  stnode.position.set(-2.1, 1.9, 0.3);
+  stnode.userData = { isSettingsNode: true, label: "settings" };
+  artifactGroup.add(stnode);
+  const stdiv = document.createElement("div");
+  stdiv.className = "track-label";
+  stdiv.innerText = "settings";
+  stdiv.style.color = SETTINGS_NODE_COLOR;
+  labelsContainer.appendChild(stdiv);
+  settingsNode = { mesh: stnode, el: stdiv, mat: stmat };
+
   fadeMat(layers.me.mat, 1, 0.03);
   fadeMat(hubFriends.mat, 0.7, 0.03);
   fadeMat(hubServices.mat, 0.7, 0.03);
@@ -566,7 +555,6 @@ export function activateMe(restoreModel) {
   activeLayer = "me";
   popupEl.el.style.display = "none";
   clearAllSubMenus(_artifactGroup);
-
   fadeMat(layers.me.mat, 1, 0.05);
   fadeMat(hubFriends.mat, 0.7, 0.05);
   fadeMat(hubServices.mat, 0.7, 0.05);
@@ -574,9 +562,8 @@ export function activateMe(restoreModel) {
   if (layers.services) fadeMat(layers.services.mat, 0, 0.05);
   if (returnNode) fadeMat(returnNode.mat, 0, 0.05);
   if (dataNode) fadeMat(dataNode.mat, 0.8, 0.05);
-
+  if (settingsNode) fadeMat(settingsNode.mat, 0.8, 0.05);
   dataMenuMats.forEach((m) => fadeMat(m, 0, 0.05));
-
   if (restoreModel) restoreModel();
   updateClickables();
 }
@@ -595,8 +582,8 @@ export function activateFriends(artifactGroup) {
   fadeMat(layers.friends.mat, 1, 0.05);
   if (layers.services) fadeMat(layers.services.mat, 0, 0.05);
   if (dataNode) fadeMat(dataNode.mat, 0, 0.05);
+  if (settingsNode) fadeMat(settingsNode.mat, 0, 0.05);
   dataMenuMats.forEach((m) => fadeMat(m, 0, 0.05));
-
   clearAllSubMenus(artifactGroup);
   ensureReturn(artifactGroup);
   returnNode.mesh.userData = {
@@ -623,8 +610,8 @@ export function activateServices(artifactGroup) {
   if (layers.friends) fadeMat(layers.friends.mat, 0, 0.05);
   fadeMat(layers.services.mat, 1, 0.05);
   if (dataNode) fadeMat(dataNode.mat, 0, 0.05);
+  if (settingsNode) fadeMat(settingsNode.mat, 0, 0.05);
   dataMenuMats.forEach((m) => fadeMat(m, 0, 0.05));
-
   clearAllSubMenus(artifactGroup);
   ensureReturn(artifactGroup);
   returnNode.mesh.userData = {
@@ -646,6 +633,7 @@ export function activatedataMenu(artifactGroup) {
   if (layers.friends) fadeMat(layers.friends.mat, 0, 0.05);
   if (layers.services) fadeMat(layers.services.mat, 0, 0.05);
   if (dataNode) fadeMat(dataNode.mat, 0, 0.05);
+  if (settingsNode) fadeMat(settingsNode.mat, 0, 0.05);
   dataMenuMats.forEach((m) => fadeMat(m, 1, 0.05));
   ensureReturn(artifactGroup);
   returnNode.mesh.userData = {
@@ -661,7 +649,6 @@ export function activatedataMenu(artifactGroup) {
 function updateClickables() {
   clickables = [];
   labelEls = [];
-
   if (activeLayer === "me") {
     clickables.push(
       ...layers.me.clickableNodes,
@@ -669,12 +656,15 @@ function updateClickables() {
       hubServices.mesh,
     );
     if (dataNode) clickables.push(dataNode.mesh);
+    if (settingsNode) clickables.push(settingsNode.mesh);
     labelEls.push(
       ...layers.me.labelEls,
       { mesh: hubFriends.mesh, el: hubFriends.el },
       { mesh: hubServices.mesh, el: hubServices.el },
     );
     if (dataNode) labelEls.push({ mesh: dataNode.mesh, el: dataNode.el });
+    if (settingsNode)
+      labelEls.push({ mesh: settingsNode.mesh, el: settingsNode.el });
   } else if (activeLayer === "friends") {
     clickables.push(...layers.friends.clickableNodes);
     if (returnNode) clickables.push(returnNode.mesh);
@@ -694,8 +684,10 @@ function updateClickables() {
       clickables.push(...dataMenuMeshes);
       labelEls.push(...dataMenuEls);
     }
-    if (returnNode) clickables.push(returnNode.mesh);
-    if (returnNode) labelEls.push({ mesh: returnNode.mesh, el: returnNode.el });
+    if (returnNode) {
+      clickables.push(returnNode.mesh);
+      labelEls.push({ mesh: returnNode.mesh, el: returnNode.el });
+    }
   }
 
   const activeEls = new Set(labelEls.map((x) => x.el));
@@ -709,10 +701,15 @@ function updateClickables() {
     ...dataMenuEls,
     ...subMenuStack.flatMap((l) => l.els),
     ...(dataNode ? [{ el: dataNode.el }] : []),
+    ...(settingsNode ? [{ el: settingsNode.el }] : []),
   ];
   allEls.forEach(({ el }) => {
     if (!el) return;
     el.style.opacity = activeEls.has(el) ? "" : "0";
     el.style.pointerEvents = activeEls.has(el) ? "" : "none";
   });
+}
+
+export function openSettingsDialog() {
+  buildSettingsDialog();
 }
