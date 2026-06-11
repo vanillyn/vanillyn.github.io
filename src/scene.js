@@ -221,21 +221,26 @@ export const _BOT_USERS = [
 ];
 
 export const _FAKE_MESSAGES = [
-  { user: "iyrs", delay: 100, text: "scene.iyrs" },
+  { user: "system", delay: 50, text: "scene.iyrs" },
+  ...Array.from({ length: 15 }, () => ({
+    user: btoa(crypto.getRandomValues(new Uint8Array(6))).substring(0, 8),
+    delay: Math.floor(Math.random() * 16) * 1 + 100,
+    text: "cupId took His shot",
+  })),
   { user: "vanillyn", delay: 4000, text: "hey chat" },
   { user: "moth", delay: 6000, text: "hi!!" },
   { user: "moth", delay: 9000, text: "how's it goin?" },
-  { user: "iyrsbot", delay: 14000, text: "OK 200" },
+  { user: "iyrsbot", delay: 14000, text: "ok 200" },
   { user: "hazellyn", delay: 20000, text: "lol" },
   { user: "toast", delay: 23000, text: "is the bot broken again" },
-  { user: "echo", delay: 26000, text: "WHERE DID MY SWEET BOT GO" },
+  { user: "echo", delay: 26000, text: "where did my sweet bot go" },
   { user: "toast", delay: 27000, text: "bot.ping" },
-  { user: "iyrsbot", delay: 27200, text: "ERROR 500" },
+  { user: "iyrsbot", delay: 27200, text: "error 500" },
   { user: "clover", delay: 32000, text: "see what you did" },
   { user: "toast", delay: 35000, text: "i didnt do anything i swear" },
   { user: "vanillyn", delay: 40000, text: "yuh" },
   { user: "hazellyn", delay: 45000, text: "im gonna reboot it" },
-  { user: "iyrsbot", delay: 52000, text: "OK 200" },
+  { user: "iyrsbot", delay: 52000, text: "ok 200" },
   { user: "moth", delay: 53000, text: "yay back to normal :3" },
 ];
 
