@@ -1,9 +1,6 @@
-import {
-  _BOT_USERS,
-  _FAKE_MESSAGES,
-  closeScene,
-  launchScene,
-} from "../scene.js";
+import { launchScene, closeScene } from "../scene.js";
+import { BOT_USERS, FAKE_MESSAGES } from "./iyrs.js";
+
 import {
   LINKS_FRIENDS,
   LINKS_ME,
@@ -536,10 +533,10 @@ function initIyrsWindow(el) {
   let fIdx = 0;
   const timers = [];
   function schedNext() {
-    if (fIdx >= _FAKE_MESSAGES.length) return;
-    const msg = _FAKE_MESSAGES[fIdx];
+    if (fIdx >= FAKE_MESSAGES.length) return;
+    const msg = FAKE_MESSAGES[fIdx];
     const tm = setTimeout(() => {
-      const u = _BOT_USERS.find((x) => x.name === msg.user) || {
+      const u = BOT_USERS.find((x) => x.name === msg.user) || {
         name: msg.user,
         color: "#aaa",
       };

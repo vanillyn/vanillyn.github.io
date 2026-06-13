@@ -1,3 +1,5 @@
+import { launchScene, closeScene } from "../scene.js";
+
 const MAZE_W = 11,
   MAZE_H = 11,
   CELL = 3.0,
@@ -16,6 +18,9 @@ const MAP = [
   [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1],
   [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
 ];
+
+const EXIT_COL = 9,
+  EXIT_ROW = 9;
 
 function isMobile() {
   return (
@@ -62,36 +67,40 @@ function makeFlameTex() {
   return new THREE.CanvasTexture(cv);
 }
 
-const mirrorVertShader = `
-varying vec3 vNormal;
-varying vec3 vPos;
+const overlayVertShader = `
+varying vec3 vViewNormal;
+varying vec3 vViewPos;
 varying vec3 vWorldPos;
 void main(){
-  vNormal = normalMatrix * normal;
-  vWorldPos = (modelMatrix * vec4(position,1.)).xyz;
-  vPos = position;
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.);
+  vViewNormal = normalize(normalMatrix * normal);
+  vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
+  vViewPos = mvPos.xyz;
+  vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
+  gl_Position = projectionMatrix * mvPos;
 }`;
 
-const mirrorFragShader = `
+const overlayFragShader = `
 uniform float uTime;
-uniform vec3 uCamPos;
-varying vec3 vNormal;
-varying vec3 vPos;
+varying vec3 vViewNormal;
+varying vec3 vViewPos;
 varying vec3 vWorldPos;
 void main(){
-  vec3 n = normalize(vNormal);
-  vec3 viewDir = normalize(uCamPos - vWorldPos);
-  vec3 r = reflect(-viewDir, n);
-  float envY = r.y * 0.5 + 0.5;
-  float shimmer = sin(uTime * 1.2 + vWorldPos.x * 0.8 + vWorldPos.z * 0.6) * 0.04;
-  vec3 envCol = mix(vec3(0.18, 0.22, 0.30), vec3(0.72, 0.82, 1.0), envY + shimmer);
-  float fresnel = pow(1.0 - max(0.0, dot(n, viewDir)), 2.2);
-  vec3 base = vec3(0.78, 0.70, 0.52);
-  vec3 col = mix(base * 0.85, envCol, 0.55 + fresnel * 0.35);
-  float scan = sin(vWorldPos.y * 18.0 + uTime * 0.3) * 0.012 + 1.0;
-  col *= scan;
-  gl_FragColor = vec4(col, 1.0);
+  vec3 n = normalize(vViewNormal);
+  vec3 v = normalize(-vViewPos);
+  float nDotV = max(0.0, dot(n, v));
+  float fresnel = pow(1.0 - nDotV, 3.2);
+
+
+
+  float scan  = sin(vWorldPos.y * 22.0 + uTime * 0.3) * 0.5 + 0.5;
+  float scan2 = sin(vWorldPos.y *  7.0 - uTime * 0.18) * 0.5 + 0.5;
+  float bands = scan * 0.06 + scan2 * 0.03;
+
+
+  vec3 fresnelCol = mix(vec3(0.55, 0.72, 1.0), vec3(0.98, 0.85, 0.55), fresnel);
+
+  float alpha = fresnel * 0.55 + bands * 0.18;
+  gl_FragColor = vec4(fresnelCol * (fresnel + bands), alpha);
 }`;
 
 function makeVhsOverlay(container) {
@@ -189,11 +198,26 @@ export function mountMirrors(container) {
     "position:absolute;bottom:28px;left:50%;transform:translateX(-50%);" +
     'font-family:"Geist Mono",monospace;font-size:10px;color:rgba(220,180,80,0.5);' +
     "letter-spacing:2px;pointer-events:none;user-select:none;transition:opacity 1.5s;z-index:10;";
-  hint.textContent = "wasd / arrows to move · mouse to look";
+  hint.textContent = "wasd / arrows to move · mouse to look · find the exit";
   container.appendChild(hint);
   setTimeout(() => {
     hint.style.opacity = "0";
   }, 5000);
+
+  const exitBtn = document.createElement("div");
+  exitBtn.style.cssText =
+    "position:absolute;top:18px;right:22px;" +
+    'font-family:"Geist Mono",monospace;font-size:11px;' +
+    "color:rgba(200,160,60,0.35);cursor:pointer;letter-spacing:2px;" +
+    "z-index:10;transition:color 0.15s;pointer-events:auto;user-select:none;";
+  exitBtn.textContent = "← exit";
+  exitBtn.onmouseenter = () => {
+    exitBtn.style.color = "rgba(200,160,60,0.9)";
+  };
+  exitBtn.onmouseleave = () => {
+    exitBtn.style.color = "rgba(200,160,60,0.35)";
+  };
+  container.appendChild(exitBtn);
 
   const r = new THREE.WebGLRenderer({ canvas, antialias: true });
   r.setSize(innerWidth, innerHeight);
@@ -236,15 +260,25 @@ export function mountMirrors(container) {
   const goldTex = makeGoldTex();
   const flameTex = makeFlameTex();
 
-  const mirrorUniforms = {
-    uTime: { value: 0 },
-    uCamPos: { value: new THREE.Vector3() },
-  };
-  const mirrorMat = new THREE.ShaderMaterial({
-    uniforms: mirrorUniforms,
-    vertexShader: mirrorVertShader,
-    fragmentShader: mirrorFragShader,
-    side: THREE.FrontSide,
+  const wallBaseMat = new THREE.MeshStandardMaterial({
+    color: 0xc8b88a,
+    roughness: 0.04,
+    metalness: 0.96,
+    side: THREE.DoubleSide,
+  });
+
+  const overlayUniforms = { uTime: { value: 0 } };
+  const wallOverlayMat = new THREE.ShaderMaterial({
+    uniforms: overlayUniforms,
+    vertexShader: overlayVertShader,
+    fragmentShader: overlayFragShader,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    side: THREE.DoubleSide,
+    polygonOffset: true,
+    polygonOffsetFactor: -1,
+    polygonOffsetUnits: -1,
   });
 
   const floorMat = new THREE.MeshStandardMaterial({
@@ -289,14 +323,19 @@ export function mountMirrors(container) {
     for (let col = 0; col < MAZE_W; col++) {
       if (!MAP[row][col]) continue;
       const wp = c2w(col, row);
-      const m = new THREE.Mesh(
-        new THREE.BoxGeometry(CELL, WALL_H, CELL),
-        mirrorMat,
-      );
-      m.position.set(wp.x, WALL_H / 2, wp.z);
-      m.castShadow = true;
-      m.receiveShadow = true;
-      scene.add(m);
+      const geo = new THREE.BoxGeometry(CELL, WALL_H, CELL);
+
+      const base = new THREE.Mesh(geo, wallBaseMat);
+      base.position.set(wp.x, WALL_H / 2, wp.z);
+      base.castShadow = true;
+      base.receiveShadow = true;
+      scene.add(base);
+
+      const overlay = new THREE.Mesh(geo, wallOverlayMat);
+      overlay.position.set(wp.x, WALL_H / 2, wp.z);
+      overlay.castShadow = false;
+      overlay.receiveShadow = false;
+      scene.add(overlay);
     }
   }
 
@@ -388,7 +427,6 @@ export function mountMirrors(container) {
     const row = Math.round(pos.z / CELL + MAZE_H / 2 - 0.5);
     if (col < 0 || col >= MAZE_W || row < 0 || row >= MAZE_H || MAP[row]?.[col])
       return;
-
     const pl = new THREE.PointLight(0xffaa33, 2.2, 8);
     pl.position.set(pos.x, 1.5, pos.z);
     pl.castShadow = true;
@@ -413,35 +451,34 @@ export function mountMirrors(container) {
     flames.push(fl);
   });
 
-  const centerMat = new THREE.MeshStandardMaterial({
-    color: 0xd4a830,
-    roughness: 0.04,
-    metalness: 1.0,
-    emissive: 0x442200,
-    emissiveIntensity: 0.6,
-  });
-  const centerMesh = new THREE.Mesh(
-    new THREE.IcosahedronGeometry(0.55, 3),
-    centerMat,
-  );
-  const centerPos = c2w(5, 5);
-  centerMesh.position.set(centerPos.x, 1.7, centerPos.z);
-  scene.add(centerMesh);
+  const exitWorldPos = c2w(EXIT_COL, EXIT_ROW);
+  const exitPortalGroup = new THREE.Group();
+  exitPortalGroup.position.copy(exitWorldPos);
 
-  const orbitMat = new THREE.MeshStandardMaterial({
-    color: 0x9ab8cc,
-    roughness: 0.02,
-    metalness: 1.0,
-    emissive: 0x112244,
-    emissiveIntensity: 0.5,
+  const portalRingGeo = new THREE.TorusGeometry(0.9, 0.06, 8, 32);
+  const portalMat = new THREE.MeshStandardMaterial({
+    color: 0x40cc80,
+    emissive: 0x20aa50,
+    emissiveIntensity: 1.2,
+    roughness: 0.3,
+    metalness: 0.8,
   });
-  const orbiters = Array.from({ length: 3 }, (_, i) => {
-    const m = new THREE.Mesh(new THREE.IcosahedronGeometry(0.18, 1), orbitMat);
-    m.userData.angle = (i / 3) * Math.PI * 2;
-    m.userData.speed = 0.5 + i * 0.12;
-    scene.add(m);
-    return m;
+  const portalRing = new THREE.Mesh(portalRingGeo, portalMat);
+  portalRing.position.y = 1.5;
+  exitPortalGroup.add(portalRing);
+
+  const postGeo = new THREE.CylinderGeometry(0.05, 0.07, WALL_H * 0.8, 6);
+  [-0.7, 0.7].forEach((x) => {
+    const post = new THREE.Mesh(postGeo, goldMat);
+    post.position.set(x, (WALL_H * 0.8) / 2, 0);
+    exitPortalGroup.add(post);
   });
+
+  const portalLight = new THREE.PointLight(0x40ff80, 2.5, 6);
+  portalLight.position.y = 1.5;
+  exitPortalGroup.add(portalLight);
+
+  scene.add(exitPortalGroup);
 
   const capsuleMat = new THREE.MeshStandardMaterial({
     color: 0x3a3060,
@@ -468,11 +505,14 @@ export function mountMirrors(container) {
 
   let yaw = Math.PI,
     pitch = 0,
+    roll = 0,
     pointerLocked = false;
+
   const onPLC = () => {
     pointerLocked = document.pointerLockElement === canvas;
   };
   document.addEventListener("pointerlockchange", onPLC);
+
   const onMouseMove = (e) => {
     if (!pointerLocked) return;
     yaw -= e.movementX * 0.002;
@@ -485,12 +525,16 @@ export function mountMirrors(container) {
 
   const SPEED = 4.5,
     PR = 0.32;
+  const inputDir = new THREE.Vector3();
+  const desiredVel = new THREE.Vector3();
+  const vel = new THREE.Vector3();
   const euler = new THREE.Euler(0, 0, 0, "YXZ");
-  const mdir = new THREE.Vector3(),
-    vel = new THREE.Vector3();
+  const flatEuler = new THREE.Euler(0, 0, 0, "YXZ");
+
   const clk = new THREE.Clock();
   let bobTime = 0;
   const BASE_Y = 1.7;
+  let exitTriggered = false;
 
   function isWall(wx, wz) {
     const col = Math.floor(wx / CELL + MAZE_W / 2);
@@ -498,9 +542,31 @@ export function mountMirrors(container) {
     if (col < 0 || col >= MAZE_W || row < 0 || row >= MAZE_H) return true;
     return MAP[row][col] === 1;
   }
+
   function tryMove(pos, dx, dz) {
     if (!isWall(pos.x + dx + Math.sign(dx) * PR, pos.z)) pos.x += dx;
     if (!isWall(pos.x, pos.z + dz + Math.sign(dz) * PR)) pos.z += dz;
+  }
+
+  function checkExitTrigger() {
+    if (exitTriggered) return;
+    const dx = Math.abs(cam.position.x - exitWorldPos.x);
+    const dz = Math.abs(cam.position.z - exitWorldPos.z);
+    if (dx < CELL * 0.85 && dz < CELL * 0.85) {
+      exitTriggered = true;
+      if (document.pointerLockElement) document.exitPointerLock();
+      const fade = document.createElement("div");
+      fade.style.cssText =
+        "position:absolute;inset:0;background:#000;opacity:0;transition:opacity 1.2s ease;z-index:20;pointer-events:none;";
+      container.appendChild(fade);
+      requestAnimationFrame(() => {
+        fade.style.opacity = "1";
+      });
+      setTimeout(() => {
+        closeScene("mirrors");
+        setTimeout(() => launchScene("forest"), 80);
+      }, 1300);
+    }
   }
 
   let raf;
@@ -509,36 +575,50 @@ export function mountMirrors(container) {
     const dt = Math.min(clk.getDelta(), 0.05);
     const t = clk.getElapsedTime();
 
-    euler.set(pitch, yaw, 0, "YXZ");
-    cam.quaternion.setFromEuler(euler);
+    inputDir.set(0, 0, 0);
+    if (keys["KeyW"] || keys["ArrowUp"]) inputDir.z -= 1;
+    if (keys["KeyS"] || keys["ArrowDown"]) inputDir.z += 1;
+    if (keys["KeyA"] || keys["ArrowLeft"]) inputDir.x -= 1;
+    if (keys["KeyD"] || keys["ArrowRight"]) inputDir.x += 1;
 
-    mdir.set(0, 0, 0);
-    if (keys["KeyW"] || keys["ArrowUp"]) mdir.z -= 1;
-    if (keys["KeyS"] || keys["ArrowDown"]) mdir.z += 1;
-    if (keys["KeyA"] || keys["ArrowLeft"]) mdir.x -= 1;
-    if (keys["KeyD"] || keys["ArrowRight"]) mdir.x += 1;
-    const moving = mdir.lengthSq() > 0;
-    if (moving) mdir.normalize().applyEuler(new THREE.Euler(0, yaw, 0));
-    vel.lerp(mdir.multiplyScalar(SPEED), 0.18);
+    const moving = inputDir.lengthSq() > 0;
+    if (moving) {
+      inputDir.normalize();
+      flatEuler.set(0, yaw, 0, "YXZ");
+      inputDir.applyEuler(flatEuler);
+    }
+
+    desiredVel.copy(inputDir).multiplyScalar(SPEED);
+    vel.lerp(desiredVel, 0.14);
+
     tryMove(cam.position, vel.x * dt, 0);
     tryMove(cam.position, 0, vel.z * dt);
 
     if (moving) bobTime += dt * 9.0;
     const bobTarget = moving ? Math.sin(bobTime) * 0.055 : 0;
     const rollTarget = moving ? Math.sin(bobTime * 0.5) * 0.008 : 0;
+
     cam.position.y += (BASE_Y + bobTarget - cam.position.y) * 0.18;
-    cam.rotation.z += (rollTarget - cam.rotation.z) * 0.12;
 
-    mirrorUniforms.uTime.value = t;
-    mirrorUniforms.uCamPos.value.copy(cam.position);
+    roll += (rollTarget - roll) * 0.12;
+    euler.set(pitch, yaw, roll, "YXZ");
+    cam.quaternion.setFromEuler(euler);
 
-    const behind = new THREE.Vector3(0, 0, 1.2).applyEuler(
-      new THREE.Euler(0, yaw, 0),
-    );
+    checkExitTrigger();
+
+    overlayUniforms.uTime.value = t;
+
+    exitPortalGroup.rotation.y = t * 0.4;
+    portalRing.rotation.x = t * 0.6;
+    portalLight.intensity = 2.0 + Math.sin(t * 3.5) * 0.6;
+
+    const behindDir = new THREE.Vector3(0, 0, 1.2);
+    flatEuler.set(0, yaw, 0, "YXZ");
+    behindDir.applyEuler(flatEuler);
     charBody.position.set(
-      cam.position.x + behind.x,
+      cam.position.x + behindDir.x,
       0,
-      cam.position.z + behind.z,
+      cam.position.z + behindDir.z,
     );
     charBody.rotation.y = yaw + Math.PI;
 
@@ -557,19 +637,6 @@ export function mountMirrors(container) {
       );
     });
 
-    centerMesh.rotation.y = t * 0.35;
-    centerMesh.rotation.x = Math.sin(t * 0.22) * 0.3;
-    centerMesh.position.y = 1.7 + Math.sin(t * 0.9) * 0.12;
-    orbiters.forEach((om) => {
-      const a = om.userData.angle + t * om.userData.speed;
-      om.position.set(
-        centerPos.x + Math.cos(a) * 1.1,
-        1.7 + Math.sin(t * 1.1 + om.userData.angle) * 0.25,
-        centerPos.z + Math.sin(a) * 1.1,
-      );
-      om.rotation.y = t * 1.2;
-    });
-
     r.render(scene, cam);
   }
   tick();
@@ -581,7 +648,7 @@ export function mountMirrors(container) {
   };
   window.addEventListener("resize", onResize);
 
-  return function cleanup() {
+  function cleanup() {
     cancelAnimationFrame(raf);
     stopVhs();
     window.removeEventListener("keydown", onKey);
@@ -591,19 +658,24 @@ export function mountMirrors(container) {
     document.removeEventListener("pointerlockchange", onPLC);
     if (document.pointerLockElement === canvas) document.exitPointerLock();
     [
-      mirrorMat,
+      wallBaseMat,
+      wallOverlayMat,
       floorMat,
       ceilMat,
       goldMat,
       pillarMat,
       flameMat,
       stickMat,
-      centerMat,
-      orbitMat,
+      portalMat,
       capsuleMat,
     ].forEach((m) => m.dispose?.());
     [goldTex, flameTex].forEach((t) => t.dispose());
-    [pillarGeo, capGeo, baseGeo, trimH, trimV].forEach((g) => g.dispose());
+    [pillarGeo, capGeo, baseGeo, trimH, trimV, portalRingGeo, postGeo].forEach(
+      (g) => g.dispose(),
+    );
     r.dispose();
-  };
+  }
+
+  exitBtn.onclick = cleanup;
+  return cleanup;
 }

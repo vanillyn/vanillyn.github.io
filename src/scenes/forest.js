@@ -1,5 +1,10 @@
 import { launchScene, closeScene } from "../scene.js";
 import { desktopWarning } from "../mobile.js";
+import {
+  saveSession,
+  markForestCleared,
+  hasClearedForest,
+} from "../session.js";
 
 const DESK_Z = -11.5;
 const DESK_X = 0;
@@ -146,9 +151,9 @@ function makeProceduralGround(size) {
   const cv = document.createElement("canvas");
   cv.width = cv.height = size;
   const ctx = cv.getContext("2d");
+  const rng = mulberry32(1);
   ctx.fillStyle = "#0a130a";
   ctx.fillRect(0, 0, size, size);
-  const rng = mulberry32(1);
   for (let i = 0; i < 4000; i++) {
     const x = rng() * size,
       y = rng() * size,
@@ -178,9 +183,9 @@ function makeProceduralPath(size) {
   const cv = document.createElement("canvas");
   cv.width = cv.height = size;
   const ctx = cv.getContext("2d");
+  const rng = mulberry32(2);
   ctx.fillStyle = "#2a1c12";
   ctx.fillRect(0, 0, size, size);
-  const rng = mulberry32(2);
   for (let i = 0; i < 2500; i++) {
     const x = rng() * size,
       y = rng() * size,
@@ -198,9 +203,9 @@ function makeProceduralBark(size) {
   const cv = document.createElement("canvas");
   cv.width = cv.height = size;
   const ctx = cv.getContext("2d");
+  const rng = mulberry32(9);
   ctx.fillStyle = "#0d0d0a";
   ctx.fillRect(0, 0, size, size);
-  const rng = mulberry32(9);
   for (let x = 0; x < size; x += 2 + Math.floor(rng() * 4)) {
     const l = Math.floor(10 + rng() * 20),
       h = 8 + Math.floor(rng() * (size - 8)),
@@ -218,13 +223,13 @@ function makeLeafTex(hue = 120) {
   const cv = document.createElement("canvas");
   cv.width = cv.height = 128;
   const ctx = cv.getContext("2d");
+  const rng = mulberry32(hue);
   ctx.fillStyle = `hsl(${hue},30%,8%)`;
   ctx.fillRect(0, 0, 128, 128);
-  const rng = mulberry32(hue);
   for (let i = 0; i < 600; i++) {
     const x = rng() * 128,
-      y = rng() * 128;
-    const l = Math.floor(6 + rng() * 12);
+      y = rng() * 128,
+      l = Math.floor(6 + rng() * 12);
     ctx.fillStyle = `hsl(${hue + (rng() - 0.5) * 20},${25 + rng() * 20}%,${l}%)`;
     ctx.fillRect(x, y, 1 + Math.floor(rng() * 3), 1 + Math.floor(rng() * 3));
   }
@@ -238,11 +243,10 @@ function makeBloomComposer(renderer, scene, camera) {
   if (
     typeof THREE.EffectComposer === "undefined" ||
     typeof THREE.UnrealBloomPass === "undefined"
-  ) {
+  )
     return null;
-  }
-  const w = renderer.domElement.width;
-  const h = renderer.domElement.height;
+  const w = renderer.domElement.width,
+    h = renderer.domElement.height;
   const composer = new THREE.EffectComposer(renderer);
   composer.addPass(new THREE.RenderPass(scene, camera));
   const bloom = new THREE.UnrealBloomPass(
@@ -307,7 +311,6 @@ function attempt(){
     locked=true;
     status.style.color="green";
     status.textContent="loading...";
-    try{localStorage.setItem("iyrs_session",JSON.stringify({user:match.user,ts:Date.now()}));}catch(e){}
     setTimeout(()=>window.parent.postMessage("login:success:"+match.user,"*"),700);
   }else{
     status.style.color="maroon";
@@ -338,36 +341,31 @@ export function mountForest(container) {
 
   const hint = document.createElement("div");
   hint.style.cssText =
-    "position:absolute;bottom:32px;left:50%;transform:translateX(-50%);" +
-    "font-family:'Geist Mono',monospace;font-size:10px;color:rgba(160,210,140,0.5);" +
-    "letter-spacing:3px;pointer-events:none;user-select:none;transition:opacity 2s;" +
-    "text-align:center;white-space:nowrap;z-index:10;";
+    "position:absolute;bottom:32px;left:50%;transform:translateX(-50%);font-family:'Geist Mono',monospace;font-size:10px;color:rgba(160,210,140,0.5);letter-spacing:3px;pointer-events:none;user-select:none;transition:opacity 2s;text-align:center;white-space:nowrap;z-index:10;";
   hint.textContent = "i found it here";
   container.appendChild(hint);
-  setTimeout(() => {
-    hint.style.opacity = "0";
-  }, 4000);
+  setTimeout(() => (hint.style.opacity = "0"), 4000);
 
   const monitorHint = document.createElement("div");
   monitorHint.style.cssText =
-    "position:absolute;bottom:80px;left:50%;transform:translateX(-50%);" +
-    "font-family:'Geist Mono',monospace;font-size:10px;color:rgba(160,210,140,0.0);" +
-    "letter-spacing:3px;pointer-events:none;user-select:none;" +
-    "transition:color 0.4s;white-space:nowrap;z-index:10;";
+    "position:absolute;bottom:80px;left:50%;transform:translateX(-50%);font-family:'Geist Mono',monospace;font-size:10px;color:rgba(160,210,140,0.0);letter-spacing:3px;pointer-events:none;user-select:none;transition:color 0.4s;white-space:nowrap;z-index:10;";
   monitorHint.textContent = "[E] use computer";
   container.appendChild(monitorHint);
 
   const exitBtn = document.createElement("div");
   exitBtn.style.cssText =
-    "position:absolute;top:18px;right:22px;font-family:'Geist Mono',monospace;" +
-    "font-size:11px;color:rgba(160,210,140,0.35);cursor:pointer;letter-spacing:2px;" +
-    "z-index:10;transition:color 0.15s;pointer-events:auto;user-select:none;";
+    "position:absolute;top:18px;right:22px;font-family:'Geist Mono',monospace;font-size:11px;color:rgba(160,210,140,0.35);cursor:pointer;letter-spacing:2px;z-index:10;transition:color 0.15s;pointer-events:auto;user-select:none;";
   exitBtn.textContent = "← exit";
-  exitBtn.onmouseenter = () => {
-    exitBtn.style.color = "rgba(160,210,140,0.9)";
-  };
-  exitBtn.onmouseleave = () => {
-    exitBtn.style.color = "rgba(160,210,140,0.35)";
+  exitBtn.onmouseenter = () => (exitBtn.style.color = "rgba(160,210,140,0.9)");
+  exitBtn.onmouseleave = () => (exitBtn.style.color = "rgba(160,210,140,0.35)");
+  exitBtn.onclick = () => {
+    if (hasClearedForest()) {
+      cleanup();
+      closeScene("forest");
+      setTimeout(() => launchScene("desktop"), 80);
+    } else {
+      cleanup();
+    }
   };
   container.appendChild(exitBtn);
 
@@ -379,9 +377,7 @@ export function mountForest(container) {
   const IFRAME_W = 640,
     IFRAME_H = 400;
   const iframe = document.createElement("iframe");
-  iframe.style.cssText =
-    `position:absolute;top:0;left:0;width:${IFRAME_W}px;height:${IFRAME_H}px;` +
-    "border:none;transform-origin:0 0;pointer-events:auto;background:#008080;";
+  iframe.style.cssText = `position:absolute;top:0;left:0;width:${IFRAME_W}px;height:${IFRAME_H}px;border:none;transform-origin:0 0;pointer-events:auto;background:#008080;`;
   iframe.setAttribute("scrolling", "no");
   iframeWrap.appendChild(iframe);
 
@@ -405,14 +401,9 @@ export function mountForest(container) {
 
   function onIframeMessage(e) {
     if (typeof e.data === "string" && e.data.startsWith("login:success")) {
-      const parts = e.data.split(":");
-      const user = parts[2] || "vanillyn";
-      try {
-        localStorage.setItem(
-          "iyrs_session",
-          JSON.stringify({ user, ts: Date.now() }),
-        );
-      } catch (_) {}
+      const user = e.data.split(":")[2] || "vanillyn";
+      saveSession(user);
+      markForestCleared();
       hideMonitor();
       closeScene("forest");
       setTimeout(() => launchScene("desktop"), 80);
@@ -459,11 +450,9 @@ export function mountForest(container) {
   moon.shadow.camera.far = 110;
   moon.shadow.bias = -0.001;
   scene.add(moon);
-
-  const moonFill = new THREE.DirectionalLight(0x3a4a60, 0.35);
-  moonFill.position.set(8, 10, 6);
-  scene.add(moonFill);
-
+  const light = new THREE.DirectionalLight(0x3a4a60, 0.35);
+  light.position.set(8, 10, 6);
+  scene.add(light);
   const groundGlow = new THREE.PointLight(0x223a18, 2.2, 26);
   groundGlow.position.set(0, 0.2, 0);
   scene.add(groundGlow);
@@ -474,16 +463,15 @@ export function mountForest(container) {
   deskLight2.shadow.mapSize.set(512, 512);
   scene.add(deskLight2);
 
-  const leafTex1 = makeLeafTex(115);
-  const leafTex2 = makeLeafTex(130);
-  const leafTex3 = makeLeafTex(100);
+  const leafTex1 = makeLeafTex(115),
+    leafTex2 = makeLeafTex(130),
+    leafTex3 = makeLeafTex(100);
 
   const groundFallbackTex = makeProceduralGround(512);
   const groundMat = new THREE.MeshLambertMaterial({
     map: groundFallbackTex,
     color: 0x1e2e14,
   });
-
   const texLoader = new THREE.TextureLoader();
   function loadTex(url, repeat = 1) {
     const t = texLoader.load(url);
@@ -491,7 +479,6 @@ export function mountForest(container) {
     t.repeat.set(repeat, repeat);
     return t;
   }
-
   const groundColorTex = loadTex(
     "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/4k/mud_forest/mud_forest_diff_4k.jpg",
     10,
@@ -563,8 +550,8 @@ export function mountForest(container) {
       tz = z;
     for (let seg = 0; seg < trunkSeg; seg++) {
       const segH = trunkH / trunkSeg;
-      const r0 = radius * 0.16 * (1 - (seg / trunkSeg) * 0.5);
-      const r1 = radius * 0.16 * (1 - ((seg + 1) / trunkSeg) * 0.5);
+      const r0 = radius * 0.16 * (1 - (seg / trunkSeg) * 0.5),
+        r1 = radius * 0.16 * (1 - ((seg + 1) / trunkSeg) * 0.5);
       const trunk = new THREE.Mesh(
         new THREE.CylinderGeometry(r1, r0, segH, 7),
         barkMat,
@@ -596,9 +583,9 @@ export function mountForest(container) {
     }
     if (h > 9) {
       for (let b = 0; b < 3; b++) {
-        const ba = ng() * Math.PI * 2;
-        const bh = trunkH * (0.4 + ng() * 0.4);
-        const bl = radius * (0.6 + ng() * 0.8);
+        const ba = ng() * Math.PI * 2,
+          bh = trunkH * (0.4 + ng() * 0.4),
+          bl = radius * (0.6 + ng() * 0.8);
         const branch = new THREE.Mesh(
           new THREE.CylinderGeometry(radius * 0.03, radius * 0.05, bl, 5),
           barkMat,
@@ -616,15 +603,18 @@ export function mountForest(container) {
   }
 
   for (let i = 0; i < 130; i++) {
-    const side = i % 2 === 0 ? 1 : -1;
-    const xOff = 2.0 + rng() * 14;
-    const z = -38 + rng() * 68;
-    const h = 7 + rng() * 14;
-    const rad = 1.5 + rng() * 1.4;
-    const mat = foliageMats[Math.floor(rng() * 3)];
-    makeTree(side * xOff, z, h, rad, mat);
+    const side = i % 2 === 0 ? 1 : -1,
+      xOff = 2.0 + rng() * 14,
+      z = -38 + rng() * 68;
+    makeTree(
+      side * xOff,
+      z,
+      7 + rng() * 14,
+      1.5 + rng() * 1.4,
+      foliageMats[Math.floor(rng() * 3)],
+    );
   }
-  for (let i = 0; i < 45; i++) {
+  for (let i = 0; i < 45; i++)
     makeTree(
       (rng() - 0.5) * 50,
       -32 - rng() * 34,
@@ -632,7 +622,6 @@ export function mountForest(container) {
       1.5 + rng() * 2.0,
       foliageMats[2],
     );
-  }
 
   const bushMat = new THREE.MeshLambertMaterial({
     map: leafTex3,
@@ -640,10 +629,10 @@ export function mountForest(container) {
     side: THREE.DoubleSide,
   });
   for (let i = 0; i < 90; i++) {
-    const side = i % 2 === 0 ? 1 : -1;
-    const x = side * (1.8 + rng() * 9);
-    const z = -34 + rng() * 58;
-    const s = 0.25 + rng() * 0.7;
+    const side = i % 2 === 0 ? 1 : -1,
+      x = side * (1.8 + rng() * 9),
+      z = -34 + rng() * 58,
+      s = 0.25 + rng() * 0.7;
     const bush = new THREE.Mesh(new THREE.IcosahedronGeometry(s, 0), bushMat);
     bush.position.set(x, s * 0.6, z);
     bush.rotation.set(rng() * 0.4, rng() * Math.PI * 2, rng() * 0.4);
@@ -688,9 +677,8 @@ export function mountForest(container) {
       i % 3 === 0 ? rockMat2 : rockMat,
     );
   }
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < 6; i++)
     makeRock(-2 + rng() * 4, -14 + rng() * 4, 0.1 + rng() * 0.35, rockMat);
-  }
 
   const dz = DESK_Z;
   const wood = new THREE.MeshLambertMaterial({ color: 0x241408 });
@@ -711,9 +699,8 @@ export function mountForest(container) {
     [1.2, -0.44],
     [-1.2, 0.44],
     [1.2, 0.44],
-  ]) {
+  ])
     box(0.07, 0.78, 0.07, woodDark, lx, 0.39, dz + lz);
-  }
 
   const screenMat = new THREE.MeshBasicMaterial({ color: 0x020505 });
   const monitorMesh = box(
@@ -725,7 +712,6 @@ export function mountForest(container) {
     SCREEN_Y,
     dz - 0.2,
   );
-
   const screenGlowMat = new THREE.MeshBasicMaterial({
     color: 0x003a10,
     transparent: true,
@@ -739,7 +725,6 @@ export function mountForest(container) {
   scene.add(screenGlowMesh);
 
   box(0.06, 0.15, 0.06, woodDark, 0, 0.95, dz - 0.2);
-
   const deskLight = new THREE.PointLight(0xffcc77, 1.8, 9);
   deskLight.position.set(-0.52, 1.42, dz - 0.28);
   deskLight.castShadow = true;
@@ -762,12 +747,18 @@ export function mountForest(container) {
   bulb.position.set(-0.52, 1.43, dz - 0.28);
   scene.add(bulb);
 
-  const kbMat = new THREE.MeshLambertMaterial({ color: 0x0f0f12 });
-  box(0.72, 0.022, 0.24, kbMat, 0.12, 0.812, dz + 0.28);
-  const mugMat = new THREE.MeshLambertMaterial({ color: 0x1a1a1e });
+  box(
+    0.72,
+    0.022,
+    0.24,
+    new THREE.MeshLambertMaterial({ color: 0x0f0f12 }),
+    0.12,
+    0.812,
+    dz + 0.28,
+  );
   const mugMesh = new THREE.Mesh(
     new THREE.CylinderGeometry(0.055, 0.045, 0.12, 10),
-    mugMat,
+    new THREE.MeshLambertMaterial({ color: 0x1a1a1e }),
   );
   mugMesh.position.set(-0.7, 0.84, dz + 0.1);
   mugMesh.castShadow = true;
@@ -792,15 +783,14 @@ export function mountForest(container) {
 
   const rayTex = makeGodRayTexture();
   const rays = [];
-  const rayPositions = [
+  [
     { x: -3, z: -5, scale: [1.8, 18, 1], opacity: 0.07 },
     { x: 1.5, z: -10, scale: [1.2, 14, 1], opacity: 0.05 },
     { x: -5, z: -18, scale: [2.2, 20, 1], opacity: 0.06 },
     { x: 4, z: -22, scale: [1.4, 16, 1], opacity: 0.045 },
     { x: -1, z: 3, scale: [1.6, 12, 1], opacity: 0.06 },
     { x: 6, z: -8, scale: [1.0, 10, 1], opacity: 0.04 },
-  ];
-  rayPositions.forEach((rp) => {
+  ].forEach((rp) => {
     const rayMat = new THREE.SpriteMaterial({
       map: rayTex,
       transparent: true,
@@ -843,8 +833,7 @@ export function mountForest(container) {
     color: 0x6688aa,
     sizeAttenuation: true,
   });
-  const mistParticles = new THREE.Points(mistGeo, mistMat);
-  scene.add(mistParticles);
+  scene.add(new THREE.Points(mistGeo, mistMat));
 
   const puffTex = makeGlowSprite(0.3);
   const puffs = [];
@@ -927,15 +916,16 @@ export function mountForest(container) {
   halo.position.copy(moonSprite.position);
   scene.add(halo);
 
-  const moonShaftMat = new THREE.SpriteMaterial({
-    map: makeGodRayTexture(),
-    transparent: true,
-    opacity: 0.09,
-    blending: THREE.AdditiveBlending,
-    color: 0xaabbdd,
-    depthWrite: false,
-  });
-  const moonShaft = new THREE.Sprite(moonShaftMat);
+  const moonShaft = new THREE.Sprite(
+    new THREE.SpriteMaterial({
+      map: makeGodRayTexture(),
+      transparent: true,
+      opacity: 0.09,
+      blending: THREE.AdditiveBlending,
+      color: 0xaabbdd,
+      depthWrite: false,
+    }),
+  );
   moonShaft.scale.set(10, 60, 1);
   moonShaft.position.set(-10, 25, -48);
   scene.add(moonShaft);
@@ -968,41 +958,40 @@ export function mountForest(container) {
   scene.add(stars);
 
   const keys = {};
-  function onKey(e) {
+  const onKey = (e) => {
     keys[e.code] = e.type === "keydown";
-  }
+  };
   window.addEventListener("keydown", onKey);
   window.addEventListener("keyup", onKey);
 
   let yaw = 0,
     pitch = 0,
     pointerLocked = false;
-  function onPLC() {
+  const onPLC = () => {
     pointerLocked = document.pointerLockElement === canvas;
-  }
+  };
   document.addEventListener("pointerlockchange", onPLC);
-  function onMouseMove(e) {
+  const onMouseMove = (e) => {
     if (!pointerLocked) return;
     yaw -= e.movementX * 0.0018;
     pitch = Math.max(-0.45, Math.min(0.42, pitch - e.movementY * 0.0018));
-  }
+  };
   document.addEventListener("mousemove", onMouseMove);
   canvas.addEventListener("click", () => {
     if (!monitorActive) canvas.requestPointerLock();
   });
-  exitBtn.addEventListener("click", cleanup);
 
   const euler = new THREE.Euler(0, 0, 0, "YXZ");
-  const moveDir = new THREE.Vector3();
-  const vel = new THREE.Vector3();
+  const moveDir = new THREE.Vector3(),
+    vel = new THREE.Vector3();
   const clk = new THREE.Clock();
   const SPEED = 3.8;
   let nearMonitor = false;
 
-  function onKeydown(e) {
+  const onKeydown = (e) => {
     if (e.code === "KeyE" && nearMonitor && !monitorActive) showMonitor();
     if (e.code === "Escape" && monitorActive) hideMonitor();
-  }
+  };
   window.addEventListener("keydown", onKeydown);
 
   const screenCorners3D = [
@@ -1011,11 +1000,11 @@ export function mountForest(container) {
     new THREE.Vector3(SCREEN_W / 2, -SCREEN_H / 2, 0.021),
     new THREE.Vector3(-SCREEN_W / 2, -SCREEN_H / 2, 0.021),
   ];
-  const _v = new THREE.Vector3();
-  const _proj = new THREE.Vector3();
+  const _v = new THREE.Vector3(),
+    _proj = new THREE.Vector3();
 
-  function projectCorner(localCorner) {
-    _v.copy(localCorner);
+  function projectCorner(lc) {
+    _v.copy(lc);
     monitorMesh.localToWorld(_v);
     _proj.copy(_v).project(cam);
     return [
@@ -1029,8 +1018,8 @@ export function mountForest(container) {
     const xs = pts.map((p) => p[0]),
       ys = pts.map((p) => p[1]);
     const minX = Math.min(...xs),
-      maxX = Math.max(...xs);
-    const minY = Math.min(...ys),
+      maxX = Math.max(...xs),
+      minY = Math.min(...ys),
       maxY = Math.max(...ys);
     const bw = maxX - minX,
       bh = maxY - minY;
@@ -1067,8 +1056,8 @@ export function mountForest(container) {
       cam.position.y = 1.72;
     }
 
-    const ddx = cam.position.x - DESK_X;
-    const ddz = cam.position.z - DESK_Z;
+    const ddx = cam.position.x - DESK_X,
+      ddz = cam.position.z - DESK_Z;
     const dist = Math.sqrt(ddx * ddx + ddz * ddz);
     const wasNear = nearMonitor;
     nearMonitor = dist < MONITOR_INTERACT_DIST && !monitorActive;
@@ -1078,7 +1067,6 @@ export function mountForest(container) {
         : "rgba(160,210,140,0.0)";
       screenGlowMat.opacity = nearMonitor ? 0.18 : 0.0;
     }
-
     if (monitorActive) updateIframeTransform();
 
     deskLight.intensity =
@@ -1094,7 +1082,6 @@ export function mountForest(container) {
         sp.material.opacity = 0.12;
       }
     });
-
     fireflies.forEach((ff) => {
       const d = ff.userData;
       ff.position.y = d.baseY + Math.sin(t * d.speed + d.phase) * 0.42;
@@ -1105,14 +1092,12 @@ export function mountForest(container) {
       ff.material.opacity =
         0.15 + Math.abs(Math.sin(t * 1.6 + d.phase * 2.1)) * 0.85;
     });
-
     rays.forEach((ray) => {
       ray.material.opacity =
         ray.userData.baseOpacity *
         (0.82 + Math.sin(t * 0.4 + ray.userData.phase) * 0.18);
     });
     moonShaft.material.opacity = 0.07 + Math.sin(t * 0.25) * 0.025;
-
     const mp = mistGeo.attributes.position.array;
     for (let i = 0; i < mistCount; i++) {
       mp[i * 3] += Math.sin(t * 0.15 + mistPhases[i]) * 0.002;
@@ -1121,7 +1106,6 @@ export function mountForest(container) {
     }
     mistGeo.attributes.position.needsUpdate = true;
     mistMat.opacity = 0.04 + Math.sin(t * 0.2) * 0.012;
-
     puffs.forEach((puff) => {
       puff.position.x += puff.userData.drift;
       if (puff.position.x > 16) puff.position.x = -16;
@@ -1130,15 +1114,11 @@ export function mountForest(container) {
         puff.userData.baseOpacity *
         (0.7 + Math.sin(t * 0.3 + puff.userData.phase) * 0.3);
     });
-
     groundGlow.intensity = 1.8 + Math.sin(t * 0.3) * 0.35;
     stars.rotation.y = t * 0.0008;
 
-    if (bloomComposer) {
-      bloomComposer.render();
-    } else {
-      r.render(scene, cam);
-    }
+    if (bloomComposer) bloomComposer.render();
+    else r.render(scene, cam);
   }
   tick();
 
@@ -1146,9 +1126,8 @@ export function mountForest(container) {
     r.setSize(window.innerWidth, window.innerHeight);
     cam.aspect = window.innerWidth / window.innerHeight;
     cam.updateProjectionMatrix();
-    if (bloomComposer) {
+    if (bloomComposer)
       bloomComposer.setSize(window.innerWidth, window.innerHeight);
-    }
   }
   window.addEventListener("resize", onResize);
 
@@ -1173,17 +1152,31 @@ export function mountForest(container) {
       woodDark,
       screenMat,
       screenGlowMat,
-      kbMat,
-      mugMat,
-      steamMat,
+      mistMat,
       groundMat,
       pathMat,
-      mistMat,
+      steamMat,
     ].forEach((m) => m.dispose?.());
+    [
+      groundFallbackTex,
+      groundColorTex,
+      pathTex,
+      barkTex,
+      leafTex1,
+      leafTex2,
+      leafTex3,
+      bulbTex,
+      haloTex,
+      ffTex,
+      puffTex,
+      mistTex,
+      moonTex,
+      rayTex,
+    ].forEach((t) => t.dispose?.());
     mistGeo.dispose();
+    starGeo.dispose();
     r.dispose();
   }
 
-  exitBtn.addEventListener("click", cleanup);
   return cleanup;
 }
